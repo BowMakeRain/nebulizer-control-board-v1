@@ -1,0 +1,5 @@
+# ESP32-S3-WROOM-1-N16R2 on native USB. CDCOnBoot=cdc is required (UART0 = FUSE_EN/FUSE_PG on this board).
+FQBN="esp32:esp32:esp32s3:CDCOnBoot=cdc,USBMode=hwcdc,FlashSize=16M,PartitionScheme=default_8MB,PSRAM=enabled"
+SKETCH="NebulizerDashboard"
+DASHBOARD="dashboard.html"
+BAUD=115200

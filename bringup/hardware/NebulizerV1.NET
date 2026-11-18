@@ -1,0 +1,455 @@
+PARTS LIST
+
+TP-SMT-PAD_50mil  TP_50mil_PAD    +3V3
+TP-SMT-PAD_50mil  TP_50mil_PAD    +5V0_DRONE
+TP-SMT-PAD_50mil  TP_50mil_PAD    +5V0_MUXO
+TP-SMT-PAD_50mil  TP_50mil_PAD    +24V
+TP-SMT-PAD_50mil  TP_50mil_PAD    +USB_5V0
+TP-SMT-PAD_50mil  TP_50mil_PAD    +VBAT_PROTECTED
+CGA5L2X7R2A105K160AARM_Capacitor_1206C1
+C-100nF-0402      Chip-0402       C2
+GMC31X7S335K100NT RM_Capacitor_1210C3
+C2012X7R2A104K125AARM_Capacitor_0805C4
+C-4.7uF-1206      Chip-1206       C5
+APA0606100M050R   APA0606100M050R-Footprint-1C6
+GCM155C71A105KE38DFP-GCM155-0_2-MFGC7
+GRM21BR61E226ME44LFP-GRM21B-0_2-e0_2_0_7-MFGC8
+C0805X103K1GECAUTORM_Capacitor_0805C9
+GRM155R62A104KE14D2ndFP-GRM155-0_05-MFGC10
+C-22nF-0402       Chip-0402       C11
+GRM188R71C224KA01DSMD-0603C       C12
+C-10nF-0402_FLT   Chip-0402       C13
+C-10nF-0402_FLT   Chip-0402       C14
+865060653010      865060653010-Footprint-1C15
+GMC04X7R105K10NT  RM_Capacitor_0402C16
+GCM1555C1H101FA16DRM_Capacitor_0402C17
+GCM1555C1H101FA16DRM_Capacitor_0402C18
+GCM1885C1H332JA16DRM_Capacitor_0603C19
+C0805C473K3GECTU  RM_Capacitor_0805C20
+GRM155R71C102KA01DRM_Capacitor_0402C21
+C0402C220K5GACTU  RM_Capacitor_0402C22
+GMC21X7R106K16NT  RM_Capacitor_0805C23
+JMK105BJ105KV-F   RM_Capacitor_0402C24
+CL05B104KP5NNNC   RM_Capacitor_0402C25
+CL05B104KP5NNNC   RM_Capacitor_0402C26
+GMC04X7R105K10NT  RM_Capacitor_0402C27
+GCM155C71A105KE38DFP-GCM155-0_2-MFGC28
+GRM155R71C102KA01DRM_Capacitor_0402C29
+GRM033Z71C104ME14DRM_Standard_0201C30
+GRM033Z71C104ME14DRM_Standard_0201C31
+JMK105BJ105KV-F   RM_Capacitor_0402C32
+GRM033Z71C104ME14DRM_Standard_0201C33
+GRM033Z71C104ME14DRM_Standard_0201C34
+GRM033Z71C104ME14DRM_Standard_0201C35
+GRM033Z71C104ME14DRM_Standard_0201C36
+GRM033Z71C104ME14DRM_Standard_0201C37
+GCM155R71H104KE02DRM_Capacitor_0402C38
+GCM155R71H104KE02DRM_Capacitor_0402C39
+GRM033Z71C104ME14DRM_Capacitor_0201C40
+GRM033Z71C104ME14DRM_Capacitor_0201C41
+GCJ188R72A104KA01DRM_Capacitor_0603C42
+GCJ188R72A104KA01DRM_Capacitor_0603C43
+GRM033Z71C104ME14DRM_Capacitor_0201C44
+GRM033Z71C104ME14DRM_Capacitor_0201C45
+GCJ188R72A104KA01DRM_Capacitor_0603C46
+GCJ188R72A104KA01DRM_Capacitor_0603C47
+GRM033Z71C104ME14DRM_Capacitor_0201C48
+GRM033Z71C104ME14DRM_Capacitor_0201C49
+GCJ188R72A104KA01DRM_Capacitor_0603C50
+GCJ188R72A104KA01DRM_Capacitor_0603C51
+GCM155C71A105KE38DFP-GCM155-0_2-MFGC52
+GRM155R62A104KE14D2ndFP-GRM155-0_05-MFGC53
+GCM155C71A105KE38DFP-GCM155-0_2-MFGC54
+EEEHD1C100AR      CAP_EEEHD1C100ARC55
+GRM188D72A105KE01JCopy of FP-CGA4J-IPC_CC56
+865060845002      WCAP-ASLL_D6.3H7.7C57
+GCM1555C1H101FA16DRM_Capacitor_0402C58
+TP-SMT-PAD_50mil  TP_50mil_PAD    CAN_H1
+TP-SMT-PAD_50mil  TP_50mil_PAD    CAN_L1
+B160-13-F         FP-SMA-MFG      D1
+ESD2CAN24DBZRQ1   SOT95P237X112-3ND2
+TP-SMT-PAD_50mil  TP_50mil_PAD    FUSE_EN
+TP-SMT-PAD_50mil  TP_50mil_PAD    FUSE_IMON
+TP-SMT-PAD_50mil  TP_50mil_PAD    FUSE_IREF
+TP-SMT-PAD_50mil  TP_50mil_PAD    FUSE_OVP
+TP-SMT-PAD_50mil  TP_50mil_PAD    FUSE_PG
+TP-SMT-PAD_50mil  TP_50mil_PAD    GND
+TP-SMT-PAD_50mil  TP_50mil_PAD    GND1
+USB4105-GF-A      GCT_USB4105-GF-AJ1
+43045-1216        43045-1216-Footprint-1J2
+505433-1291       505433-1291-Footprint-1J3
+430450212         MOLEX_430450212 J4
+220201-0471       220201-0471-Footprint-1J5
+533984006         CONN_533980002-SD_06_MOLJ6
+43045-0802        FP-43045-0802-MFGJ7
+VBAT Connection Custom - NebulizerNew footprint 1 J8
+VBAT Connection Custom - NebulizerNew footprint 1 J9
+VBAT Connection Custom - NebulizerNew footprint 1 J10
+VBAT Connection Custom - NebulizerNew footprint 1 J11
+VBAT Connection Custom - NebulizerNew footprint 1 J12
+VBAT Connection Custom - NebulizerNew footprint 1 J13
+7447709390        7447709390-Footprint-1L1
+Plated Through Hole Custom - M3New footprint 1 MP1
+Plated Through Hole Custom - M3New footprint 1 MP2
+Plated Through Hole Custom - M3New footprint 1 MP3
+Plated Through Hole Custom - M3New footprint 1 MP4
+CSD19537Q3        FP-DQG0008A-MFG Q1
+CSD19537Q3        FP-DQG0008A-MFG Q2
+CSD19537Q3        FP-DQG0008A-MFG Q3
+CSD19537Q3        FP-DQG0008A-MFG Q4
+CSD19537Q3        FP-DQG0008A-MFG Q5
+CSD19537Q3        FP-DQG0008A-MFG Q6
+SQ2364EES-T1_GE3  FP-S-03946-MFG  Q7
+RC0805FR-07150RL  RM_Resistor_0805R1
+ERA-2AEB104X      RM_Resistor_0402R2
+R-100K-0402       Chip-0402       R3
+R-64.9K-0402      Chip-0402       R4
+CR0402-FX-4321GLF RM_Resistor_0402R5
+R-10k-0402-0.1%   RM_Resistor_0402R6
+RC0402FR-074K7L   RESC1005X40X25NL05T10R7
+RC0402FR-074K7L   RESC1005X40X25NL05T10R8
+R-10k-0402-0.1%   RM_Resistor_0402R9
+RT0402BRD07100KL  RM_Resistor_0402R10
+RT0402BRD07100KL  RM_Resistor_0402R11
+RG1005P-362-B-T5  RM_Resistor_0402R12
+RC0402FR-1311K5L  RM_Resistor_0402R13
+ERA2AEB152X       RM_Resistor_0402R14
+R-5.1k-0402-0.1%  Chip-0402       R15
+R-5.1k-0402-0.1%  Chip-0402       R16
+ERA-2AEB222X      RM_Resistor_0402R17
+ERA-2AEB4022X     RM_Resistor_0402R18
+RT0603BRD071K35L  RM_Resistor_0603R19
+RC0402FR-07402KL  RM_Resistor_0402R20
+RT0402BRD073K7L   RM_Resistor_0402R21
+R-10k-0402-0.1%   Chip-0402       R22
+R-10k-0402-0.1%   Chip-0402       R23
+RC0402FR-0775KL   FP-RC0402-0_4-IPC_CR24
+RC0402FR-074K7L   RESC1005X40X25NL05T10R25
+RC0402FR-074K7L   RESC1005X40X25NL05T10R26
+R-10k-0402-0.1%   RM_Resistor_0402R27
+ERJ-2GE0R00X      RM_Resistor_0402R28
+ERJ-2GE0R00X      RM_Resistor_0402R29
+ERJ-2GE0R00X      RM_Resistor_0402R30
+ERJ-2GE0R00X      RM_Resistor_0402R31
+ERJ-2GE0R00X      RM_Resistor_0402R32
+ERA-2AEB103X      RM_Resistor_0402R33
+ERA-2AEB103X      RM_Resistor_0402R34
+RC0402FR-074K7L   RESC1005X40X25NL05T10R35
+RC0402FR-074K7L   RESC1005X40X25NL05T10R36
+ERA-2AEB103X      RM_Resistor_0402R37
+RMCF0402FT5R10    RM_Resistor_0402R38
+ERA-2AEB103X      RM_Resistor_0402R39
+ERA-2AEB103X      RM_Resistor_0402R40
+RC0402FR-074K7L   RESC1005X40X25NL05T10R41
+RC0402FR-074K7L   RESC1005X40X25NL05T10R42
+ERA-2AEB103X      RM_Resistor_0402R43
+ERA-2AEB103X      RM_Resistor_0402R44
+ERA-2AEB103X      RM_Resistor_0402R45
+RC0402FR-074K7L   RESC1005X40X25NL05T10R46
+RC0402FR-074K7L   RESC1005X40X25NL05T10R47
+RMCF0603FG22R0    RM_Resistor_0603R48
+RMCF0603FG22R0    RM_Resistor_0603R49
+RC0402FR-074K7L   RESC1005X40X25NL05T10R50
+RC0402FR-074K7L   RESC1005X40X25NL05T10R51
+RMCF0603FG22R0    RM_Resistor_0603R52
+RMCF0603FG22R0    RM_Resistor_0603R53
+RC0402FR-074K7L   RESC1005X40X25NL05T10R54
+RC0402FR-074K7L   RESC1005X40X25NL05T10R55
+RMCF0603FG22R0    RM_Resistor_0603R56
+RMCF0603FG22R0    RM_Resistor_0603R57
+RC0402FR-07330RL  RM_Resistor_0402R58
+ERA-2AEB103X      RM_Resistor_0402R59
+RC0402FR-074K7L   RESC1005X40X25NL05T10R60
+RC0402FR-074K7L   RESC1005X40X25NL05T10R61
+ERJ-2GE0R00X      RM_Resistor_0402R62
+120R3J            RESC0603(1608)_LR63
+RT0402BRD131KL    RM_Resistor_0402R64
+TP-TH-DMM         TP-TH-DMM-Footprint-1TP1
+TP-TH-DMM         TP-TH-DMM-Footprint-1TP2
+TP-TH-DMM         TP-TH-DMM-Footprint-1TP5
+TP-TH-DMM         TP-TH-DMM-Footprint-1TP6
+TPS16851AVMAR     TPS16851AVMAR-Footprint-1U1
+ESP32-S3-WROOM-1U-N16R2XCVR_ESP32-S3-WROOM-1U-N16R2U2
+TJA1051TK/3/1J    FP-SOT782-1-IPC_CU3
+SHT45-AD1F-R2     SHT4X           U4
+24AA02UIDT-I/OT   MCHP-SOT-23-OT5_NU5
+DRV8434APWPR      DRV8434APWPR_TEXU6
+TPS2121RUXR       FP-RUX0012A-MFG U7
+LMR38020FSDDAR    DDA0008E-IPC_A  U8
+INA740BIREMR      INA740BIREMR-Footprint-1U9
+INA740BIREMR      INA740BIREMR-Footprint-1U10
+ADS7828EB/250     TI-PW16_M       U11
+INA740BIREMR      INA740BIREMR-Footprint-1U12
+INA740BIREMR      INA740BIREMR-Footprint-1U13
+SSCDANN150PG2A3   SSCDANN150PG2A3-Footprint-1U14
+INA740BIREMR      INA740BIREMR-Footprint-1U15
+INA740BIREMR      INA740BIREMR-Footprint-1U16
+SSCDANN150PG2A3   SSCDANN150PG2A3-Footprint-1U17
+LTC7001IMSE#TRPBF FP-MSE-10-05-08-1664-MFGU18
+LTC7001IMSE#TRPBF FP-MSE-10-05-08-1664-MFGU19
+LTC7001IMSE#TRPBF FP-MSE-10-05-08-1664-MFGU20
+LTC7001IMSE#TRPBF FP-MSE-10-05-08-1664-MFGU21
+LTC7001IMSE#TRPBF FP-MSE-10-05-08-1664-MFGU22
+LTC7001IMSE#TRPBF FP-MSE-10-05-08-1664-MFGU23
+TLV75733PDRVR     VREG_TLV75733PDRVRU24
+TP-SMT-PAD_50mil  TP_50mil_PAD    VBAT
+EOS
+NET LIST
+
+NODENAME USB_D_P          $
+    J1        A6  J1        B6  U2        14
+NODENAME USB_D_N          $
+    J1        A7  J1        B7  U2        13
+NODENAME SOL_TRIG         $
+    R58        1  U2        17
+NODENAME SOL_GND          $
+    D1         2  J4         2  Q7         3
+NODENAME SDA-1            $
+    J6         2  J11        1  R25        1  U2        39  U10        5  U13        5  U15        5  U17        3
+NODENAME SDA-0            $
+    J9         1  R7         1  U2        21  U4         1  U5         3  U9         5  U11       15  U12        5  U14        3  U16        5
+NODENAME SCL-1            $
+    J6         5  J11        2  R26        1  U2        38  U10        6  U13        6  U15        6  U17        4
+NODENAME SCL-0            $
+    J9         2  R8         1  U2        20  U4         2  U5         1  U9         6  U11       14  U12        6  U14        4  U16        6
+NODENAME REG_THERM        $
+    J3         1  R37        1  U11        1
+NODENAME REG_HTR_INA      $
+    Q1   5-6-7-8  U9         7
+NODENAME REG_HTR_ALRT     $
+    R35        2  U2        34  U9        10
+NODENAME REG_HEATER_TRIG  $
+    R50        1  U2        35  U18        4
+NODENAME REG_HEATER       $
+    C42        1  J2         3  Q1         1  Q1         2  Q1         3  U18        8
+NODENAME NOZZLE_THERM     $
+    J3         3  R39        1  U11        2
+NODENAME NOZZLE_HTR_INA   $
+    Q3   5-6-7-8  U12        7
+NODENAME NOZZLE_HTR_ALRT  $
+    R41        2  U2        28  U12       10
+NODENAME NOZZLE_HEATER_TRIG$
+    R54        1  U2        29  U20        4
+NODENAME NOZZLE_HEATER    $
+    C46        1  J2         1  Q3         1  Q3         2  Q3         3  U20        8
+NODENAME NetU16-8         $
+    U16        8  U16        9
+NODENAME NetU16-1         $
+    U16        1  U16        2
+NODENAME NetU15-8         $
+    U15        8  U15        9
+NODENAME NetU15-1         $
+    U15        1  U15        2
+NODENAME NetU13-8         $
+    U13        8  U13        9
+NODENAME NetU13-1         $
+    U13        1  U13        2
+NODENAME NetU12-8         $
+    U12        8  U12        9
+NODENAME NetU12-1         $
+    U12        1  U12        2
+NODENAME NetU10-8         $
+    U10        8  U10        9
+NODENAME NetU10-1         $
+    U10        1  U10        2
+NODENAME NetU9-8          $
+    U9         8  U9         9
+NODENAME NetU9-1          $
+    U9         1  U9         2
+NODENAME NetR57-1         $
+    R57        1  U23        7
+NODENAME NetR56-1         $
+    R56        1  U22        7
+NODENAME NetR53-1         $
+    R53        1  U21        7
+NODENAME NetR52-1         $
+    R52        1  U20        7
+NODENAME NetR49-1         $
+    R49        1  U19        7
+NODENAME NetR48-1         $
+    R48        1  U18        7
+NODENAME NetR31-2         $
+    R31        2  R32        2  U6        22
+NODENAME NetR29-2         $
+    R29        2  R30        2  U6        18
+NODENAME NetR24-2         $
+    R24        2  U7        10
+NODENAME NetR22-1         $
+    R22        1  R23        2  U7         6
+NODENAME NetR13-1         $
+    R13        1  R14        2  U6        17
+NODENAME NetR4-2          $
+    R4         2  U8         4
+NODENAME NetR3-1          $
+    R3         1  R5         2  U8         5
+NODENAME NetR2-1          $
+    R2         1  U8         6
+NODENAME NetQ7-1          $
+    Q7         1  R58        2  R59        2
+NODENAME NetQ6-4          $
+    Q6         4  R57        2  U23        6
+NODENAME NetQ5-4          $
+    Q5         4  R56        2  U22        6
+NODENAME NetQ4-4          $
+    Q4         4  R53        2  U21        6
+NODENAME NetQ3-4          $
+    Q3         4  R52        2  U20        6
+NODENAME NetQ2-4          $
+    Q2         4  R49        2  U19        6
+NODENAME NetQ1-4          $
+    Q1         4  R48        2  U18        6
+NODENAME NetJ1_B5         $
+    J1        B5  R16        2
+NODENAME NetJ1_A5         $
+    J1        A5  R15        2
+NODENAME NetC51-2         $
+    C51        2  U23        9
+NODENAME NetC50-2         $
+    C50        2  U22        9
+NODENAME NetC47-2         $
+    C47        2  U21        9
+NODENAME NetC46-2         $
+    C46        2  U20        9
+NODENAME NetC43-2         $
+    C43        2  U19        9
+NODENAME NetC42-2         $
+    C42        2  U18        9
+NODENAME NetC32-2         $
+    C32        2  C33        2  R38        2  U11       10  U11       16
+NODENAME NetC26-2         $
+    C26        2  U7        11
+NODENAME NetC12-2         $
+    C12        2  U6         1
+NODENAME NetC11-2         $
+    C11        2  U6        28
+NODENAME NetC11-1         $
+    C11        1  U6        27
+NODENAME NetC2-2          $
+    C2         2  U8         7
+NODENAME NetC2-1          $
+    C2         1  L1         1  U8         8
+NODENAME NetC1-2          $
+    C1         2  R1         1  U1         9
+NODENAME MOTOR_TRQ_CNT_ADC$
+    C29        2  U2        10  U6        20
+NODENAME MOTOR_STL_REP    $
+    R34        2  U2        11  U6        19
+NODENAME MOTOR_STL_MODE   $
+    U2         9  U6        21
+NODENAME MOTOR_STEP       $
+    U2         8  U6        23
+NODENAME MOTOR_PIN6       $
+    J5         2  U6         8  U6         9
+NODENAME MOTOR_PIN4       $
+    J5         4  U6        10  U6        11
+NODENAME MOTOR_PIN3       $
+    J5         3  U6         6  U6         7
+NODENAME MOTOR_PIN1       $
+    J5         1  U6         4  U6         5
+NODENAME MOTOR_NSLEEP     $
+    U2         5  U6        26
+NODENAME MOTOR_NFAULT     $
+    R33        1  U2        12  U6        16
+NODENAME MOTOR_DRIVER_EN  $
+    U2         6  U6        25
+NODENAME MOTOR_DIR        $
+    U2         7  U6        24
+NODENAME MCU_EN           $
+    C27        2  R27        1  TP1        1  U2         3
+NODENAME MCU_BOOT         $
+    TP6        1  U2        27
+NODENAME GND              $
+    C1         1  C3         1  C4         1  C5         1  C6         2  C7         1  C8         1  C9         1  C10        1  C13        2  C14        2  C15        2  C16        1  C17        1  C18        1  C19        1  C20        1  C21        1  C22        1  C23        1  C24        1  C25        1  C26        1  C27        1  C28        1  C29        1  C30        1  C31        1  C32        1  C33        1  C34        1  C35        1  C36        1  C37        1  C38        1  C39        1  C40        1  C41        1  C44        1  C45        1  C48        1  C49        1  C52        1  C53        1  C54        1  C55        2  C56        1  C57        2  C58        1  D2         3  GND        1  GND1       1  J1    A1_B12  J1    B1_A12  J1        S1  J1        S2  J1        S3  J1        S4  J2         2  J2         4  J2         6  J2         7  J2         9  J2        11  J3         2  J3         4  J3         6  J3         8  J3        10  J3        12  J3        13  J3        14  J5         5  J5         6  J6         1  J6         4  J6         7  J6         8  J7         2  J7         3  J7         7  J8         2  J10        2  J12        2  Q7         2  R4         1  R5         1  R12        1  R14        1  R15        1  R16        1  R17        1  R18        1  R19        1  R20        1  R21        1  R23        1  R24        1  R30        1  R32        1  R50        2  R51        2  R54        2  R55        2  R59        1  R60        2  R61        2  TP2        1  TP5        1  U1         5  U2         1  U2        40  U2      41_1  U2      41_2  U2      41_3  U2      41_4  U2      41_5  U2      41_6  U2      41_7  U2      41_8  U2      41_9  U3         2  U3         8  U3         9  U4         4  U5         2  U6         3  U6        12  U6        14  U6      EPAD  U7         3  U7         4  U7         5  U7         9  U7        12  U8         1  U8         9  U9         3  U9         4  U9        12  U10        3  U10       12  U11        9  U11       11  U11       12  U11       13  U12        3  U12       12  U13        4  U13       12  U14        1  U15        3  U15        4  U15       12  U16       12  U17        1  U18        2  U18        3  U18        5  U18       11  U19        2  U19        3  U19        5  U19       11  U20        2  U20        3  U20        5  U20       11  U21        2  U21        3  U21        5  U21       11  U22        2  U22        3  U22        5  U22       11  U23        2  U23        3  U23        5  U23       11  U24        2  U24        3  U24        5  U24        7
+NODENAME FUSE_TEMP_ADC_IN $
+    C58        2  R62        2  R64        2
+NODENAME FUSE_TEMP        $
+    R64        1  U1        15
+NODENAME FUSE_SFT_SEL     $
+    R20        2  U1         6
+NODENAME FUSE_PG          $
+    FUSE_PG    1  R6         1  U1        19  U2        36
+NODENAME FUSE_OVP         $
+    C18        2  FUSE_OVP   1  R11        1  R17        2  U1        18
+NODENAME FUSE_ITIMER      $
+    C19        2  U1        14
+NODENAME FUSE_IREF        $
+    C21        2  FUSE_IREF  1  R18        2  U1         3
+NODENAME FUSE_IMON        $
+    C22        2  FUSE_IMON  1  R21        2  R28        2  U1         2
+NODENAME FUSE_ILIM        $
+    R19        2  U1         1
+NODENAME FUSE_FLT         $
+    R9         1  U1        13  U2         4
+NODENAME FUSE_EN/UVLO     $
+    C17        2  FUSE_EN    1  R10        1  R12        2  U1        16  U2        37
+NODENAME FUSE_dVdT        $
+    C20        2  U1         4
+NODENAME EXTRA_THERM4     $
+    J3        11  R45        1  U11        6
+NODENAME EXTRA_THERM3     $
+    J3         9  R44        1  U11        5
+NODENAME EXTRA_THERM2     $
+    J3         7  R43        1  U11        4
+NODENAME EXTRA_THERM1     $
+    J3         5  R40        1  U11        3
+NODENAME EXTRA_HTR_INA4   $
+    Q6   5-6-7-8  U16        7
+NODENAME EXTRA_HTR_INA3   $
+    Q4   5-6-7-8  U13        7
+NODENAME EXTRA_HTR_INA2   $
+    Q2   5-6-7-8  U10        7
+NODENAME EXTRA_HTR_INA1   $
+    Q5   5-6-7-8  U15        7
+NODENAME EXTRA_HTR_ALRT4  $
+    R47        2  U2        23  U16       10
+NODENAME EXTRA_HTR_ALRT3  $
+    R42        2  U2        25  U13       10
+NODENAME EXTRA_HTR_ALRT2  $
+    R36        2  U2        18  U10       10
+NODENAME EXTRA_HTR_ALRT1  $
+    R46        2  U2        31  U15       10
+NODENAME EXTRA_HEATER_TRIG4$
+    R61        1  U2        22  U23        4
+NODENAME EXTRA_HEATER_TRIG3$
+    R55        1  U2        24  U21        4
+NODENAME EXTRA_HEATER_TRIG2$
+    R51        1  U2        19  U19        4
+NODENAME EXTRA_HEATER_TRIG1$
+    R60        1  U2        30  U22        4
+NODENAME EXTRA_HEATER4    $
+    C51        1  J2         5  Q6         1  Q6         2  Q6         3  U23        8
+NODENAME EXTRA_HEATER3    $
+    C47        1  J2        10  Q4         1  Q4         2  Q4         3  U21        8
+NODENAME EXTRA_HEATER2    $
+    C43        1  J2        12  Q2         1  Q2         2  Q2         3  U19        8
+NODENAME EXTRA_HEATER1    $
+    C50        1  J2         8  Q5         1  Q5         2  Q5         3  U22        8
+NODENAME DVDD_5V          $
+    C16        2  R13        2  U6        15
+NODENAME CAN_TX           $
+    U2        33  U3         1
+NODENAME CAN_RX           $
+    U2        32  U3         4
+NODENAME CAN_L            $
+    CAN_L1     1  D2         1  J7         5  R63        2  U3         6
+NODENAME CAN_H            $
+    CAN_H1     1  D2         2  J7         1  R63        1  U3         7
+NODENAME ADS_CH7          $
+    J13        2  R62        1  U11        8
+NODENAME ADS_CH6          $
+    J13        1  R28        1  U11        7
+NODENAME +VBAT_PROTECTED  $
+    +VBAT_PROTECTED1  C3         2  C4         2  J8         1  U1         7  U1         8  U8         2  U8         3  U9        13  U9        14  U10       13  U10       14  U12       13  U12       14  U13       13  U13       14  U15       13  U15       14  U16       13  U16       14
+NODENAME +VBAT            $
+    C9         2  C56        2  C57        1  J7         4  J7         8  R1         2  R10        2  R11        2  U1        10  U1        22  U1        23  U1        24  VBAT       1
+NODENAME +USB_5V0         $
+    +USB_5V0   1  J1     A4_B9  J1     B4_A9  R22        2  U7         7
+NODENAME +24V             $
+    +24V       1  C5         2  C6         1  C12        1  C13        1  C14        1  C15        1  D1         1  J4         1  L1         2  R2         2  R3         2  U6         2  U6        13
+NODENAME +5V0_MUXO        $
+    +5V0_MUXO  1  C23        2  C24        2  C25        2  C40        2  C41        2  C44        2  C45        2  C48        2  C49        2  C52        2  J10        1  U3         3  U7         1  U7         8  U18        1  U19        1  U20        1  U21        1  U22        1  U23        1  U24        4  U24        6
+NODENAME +5V0_DRONE       $
+    +5V0_DRONE 1  C54        2  C55        1  J7         6  U7         2
+NODENAME +3V3             $
+    +3V3       1  C7         2  C8         2  C10        2  C28        2  C30        2  C31        2  C34        2  C35        2  C36        2  C37        2  C38        2  C39        2  C53        2  J6         3  J12        1  R6         2  R7         2  R8         2  R9         2  R25        2  R26        2  R27        2  R29        1  R31        1  R33        2  R34        1  R35        1  R36        1  R37        2  R38        1  R39        2  R40        2  R41        1  R42        1  R43        2  R44        2  R45        2  R46        1  R47        1  U2         2  U3         5  U4         3  U5         4  U9        11  U10        4  U10       11  U12        4  U12       11  U13        3  U13       11  U14        2  U15       11  U16        3  U16        4  U16       11  U17        2  U24        1
+EOS

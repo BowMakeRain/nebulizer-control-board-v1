@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nebulizer I2C Monitor</title>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--text:#1b1f24;--mute:#6a737d;--line:#dfe3e8;--ok:#1a7f37;--okbg:#dafbe1;--warn:#9a6700;--warnbg:#fff8c5;--bad:#cf222e;--badbg:#ffebe9;--accent:#0969da}
+  @media (prefers-color-scheme:dark){:root{--bg:#0d1117;--card:#161b22;--text:#e6edf3;--mute:#8b949e;--line:#30363d;--ok:#3fb950;--okbg:#12261a;--warn:#d29922;--warnbg:#2d2411;--bad:#f85149;--badbg:#2d1214;--accent:#58a6ff}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif}
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:2}
+  h1{font-size:17px;margin:0 8px 0 0}
+  button{font:inherit;padding:6px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  #conn{color:var(--mute)}
+  #summary{margin-left:auto;font-weight:600}
+  main{padding:16px;max-width:1300px;margin:0 auto}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:22px 0 8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;border-left-width:5px}
+  .card.live{border-left-color:var(--ok)} .card.warn{border-left-color:var(--warn)} .card.off{border-left-color:var(--bad);opacity:.8}
+  .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .name{font-weight:600}
+  .sub{color:var(--mute);font-size:12px;font-family:ui-monospace,Menlo,monospace}
+  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap}
+  .live .pill{background:var(--okbg);color:var(--ok)} .warn .pill{background:var(--warnbg);color:var(--warn)} .off .pill{background:var(--badbg);color:var(--bad)}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  td{padding:2px 0;font-size:13px} td.v{text-align:right;font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,monospace}
+  .note{margin-top:6px;font-size:12px;color:var(--warn)}
+  .off .vals{display:none}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{padding:3px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:12px}
+  .chip.hi b{color:var(--ok)} .chip.lo b{color:var(--bad)}
+  #banner{display:none;margin-bottom:12px;padding:10px 14px;border-radius:6px;background:var(--badbg);color:var(--bad);border:1px solid var(--bad)}
+  #unexp{color:var(--warn)}
+  .ctlbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px}
+  button.stop{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:700}
+  button.on{background:var(--ok);border-color:var(--ok);color:#fff}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .htile.on{border-left-color:var(--warn)} .htile .big{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+  .htile .row{display:flex;gap:18px;margin:8px 0}
+  .htile .lbl{font-size:11px;color:var(--mute)}
+  .htile .state{font-weight:700} .htile.on .state{color:var(--warn)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Nebulizer I2C Monitor</h1>
+  <button id="connect" class="primary">Connect board</button>
+  <button id="demo">Demo data</button>
+  <span id="conn">Not connected</span>
+  <span id="summary"></span>
+</header>
+<main>
+  <div id="banner"></div>
+  <h2>Heater outputs <span class="sub">outputs drive real loads &middot; auto-off after <span id="maxon">10</span> s &middot; all off if this page stops responding</span></h2>
+  <div class="ctlbar">
+    <label><input type="checkbox" id="arm"> Arm outputs</label>
+    <button id="alloff" class="stop">ALL OFF</button>
+    <button id="fuse">E-fuse: ?</button>
+    <span class="sub" id="ctlnote"></span>
+  </div>
+  <div class="grid" id="heaters"></div>
+  <h2>Bus 0 &nbsp;<span class="sub">SDA GPIO13 / SCL GPIO12</span></h2>
+  <div class="grid" id="bus0"></div>
+  <h2>Bus 1 &nbsp;<span class="sub">SDA GPIO1 / SCL GPIO2</span></h2>
+  <div class="grid" id="bus1"></div>
+  <h2>Unexpected I2C addresses</h2>
+  <div id="unexp" class="sub">none</div>
+  <h2>Digital status lines</h2>
+  <div class="chips" id="gpio"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let lastRx = 0, demoTimer = null, port = null, reader = null;
+
+function hex(a){ return '0x' + a.toString(16).toUpperCase().padStart(2,'0'); }
+function fmt(v){
+  if (v === null) return '—';
+  const a = Math.abs(v);
+  return a >= 1e6 ? v.toFixed(0) : a >= 100 ? v.toFixed(1) : v.toFixed(3);
+}
+
+function render(m){
+  lastRx = Date.now();
+  $('banner').style.display = 'none';
+  updateHeaters(m);
+  let live = 0, good = 0;
+  for (const b of [0,1]) {
+    const el = $('bus' + b);
+    const devs = m.devs.filter(d => d.bus === b);
+    el.innerHTML = devs.map(d => {
+      if (d.live) live++;
+      if (d.live && d.ok) good++;
+      const cls = !d.live ? 'off' : d.ok ? 'live' : 'warn';
+      const pill = !d.live ? 'OFFLINE' : d.ok ? 'LIVE' : 'ACK / BAD DATA';
+      const rows = d.vals.map(([k,v]) => `<tr><td>${k}</td><td class="v">${fmt(v)}</td></tr>`).join('');
+      return `<div class="card ${cls}">
+        <div class="top"><span class="name">${d.name}</span><span class="pill">${pill}</span></div>
+        <div class="sub">${d.ref} · ${hex(d.addr)}</div>
+        <div class="vals"><table>${rows}</table>${d.note ? `<div class="note">${d.note}</div>` : ''}</div>
+      </div>`;
+    }).join('');
+    if (m.stuck && m.stuck[b]) el.insertAdjacentHTML('afterbegin',
+      `<div class="card off"><div class="top"><span class="name">Bus ${b} stuck</span><span class="pill">SDA/SCL LOW</span></div><div class="sub">a line is held low - check shorts / pull-ups</div></div>`);
+  }
+  $('summary').textContent = `${good}/${m.devs.length} healthy · ${live} responding`;
+  $('unexp').textContent = m.unexpected.length ? m.unexpected.map(([b,a]) => `bus ${b} ${hex(a)}`).join(', ') : 'none';
+  $('gpio').innerHTML = m.gpio.map(([n,v]) => `<span class="chip ${v ? 'hi' : 'lo'}">${n}: <b>${v ? 'HIGH' : 'LOW'}</b></span>`).join('');
+}
+
+function showBanner(t){ const b = $('banner'); b.textContent = t; b.style.display = 'block'; }
+setInterval(() => {
+  if ((port || demoTimer) && Date.now() - lastRx > 4000) showBanner('No data from the board for 4 s — is the firmware running and the Arduino Serial Monitor closed?');
+}, 1000);
+
+// ---------------------------------------------------------------- heater controls (server mode only)
+const HEATERS = [
+  {name:'REG heater',    j2:3,  gpio:42, bus:0, addr:0x40},
+  {name:'NOZZLE heater', j2:1,  gpio:36, bus:0, addr:0x41},
+  {name:'EXTRA heater 1',j2:8,  gpio:37, bus:1, addr:0x40},
+  {name:'EXTRA heater 2',j2:12, gpio:11, bus:1, addr:0x41},
+  {name:'EXTRA heater 3',j2:10, gpio:47, bus:1, addr:0x44},
+  {name:'EXTRA heater 4',j2:5,  gpio:14, bus:0, addr:0x45},
+];
+const serverMode = location.protocol.startsWith('http');
+let lastOut = null;
+function sendCmd(c){
+  if (!serverMode) return;
+  fetch('/cmd', {method:'POST', headers:{'X-Requested-With':'dashboard'}, body:c}).catch(() => {});
+}
+$('heaters').innerHTML = HEATERS.map((h,i) => `<div class="card htile" id="h${i}">
+  <div class="top"><span class="name">${h.name}</span><span class="state" id="hs${i}">OFF</span></div>
+  <div class="sub">connector J2.${h.j2} · GPIO${h.gpio} · INA ${hex(h.addr)} (bus ${h.bus})</div>
+  <div class="row"><div><div class="big" id="hv${i}">—</div><div class="lbl">volts at output*</div></div>
+  <div><div class="big" id="hi${i}">—</div><div class="lbl">current (mA)</div></div></div>
+  <button id="hb${i}">Turn ON</button><div class="note" id="hn${i}"></div></div>`).join('') +
+  `<div class="sub" style="grid-column:1/-1">*Measured by the INA740 on the supply side of the heater FET, so it reads the output voltage only while that heater is ON. While OFF it shows the rail voltage, not the connector. There is no ADC on the connector pin itself.</div>`;
+HEATERS.forEach((h,i) => $('hb'+i).onclick = () => {
+  const on = lastOut && lastOut.h[i];
+  sendCmd(`H,${i},${on ? 0 : 1}`);
+});
+$('alloff').onclick = () => { sendCmd('OFF'); $('arm').checked = false; updateControls(); };
+$('arm').onchange = () => { if (!$('arm').checked) sendCmd('OFF'); updateControls(); };
+$('fuse').onclick = () => sendCmd(`FUSE,${lastOut && lastOut.inhibit ? 0 : 1}`);
+setInterval(() => { if ($('arm').checked) sendCmd('PING'); }, 1000);   // dead-man: board turns heaters off if pings stop
+
+function updateControls(){
+  const armed = $('arm').checked, ok = serverMode && lastOut;
+  $('arm').disabled = !ok; $('alloff').disabled = !ok;
+  HEATERS.forEach((h,i) => { $('hb'+i).disabled = !(ok && armed); });
+  $('fuse').disabled = !ok || (!armed && lastOut && lastOut.inhibit);
+  $('ctlnote').textContent = !serverMode ? 'Controls need the local server (esp32.sh serve).' :
+    !lastOut ? 'Waiting for output status from the board (re-flash the latest firmware).' : (armed ? 'ARMED' : 'Disarmed: tick Arm outputs to enable the ON buttons');
+}
+function updateHeaters(m){
+  lastOut = m.out || null;
+  if (lastOut) {
+    $('maxon').textContent = Math.round(lastOut.maxon / 1000);
+    HEATERS.forEach((h,i) => {
+      const on = !!lastOut.h[i];
+      const d = m.devs.find(x => x.bus === h.bus && x.addr === h.addr);
+      const val = k => { const e = d && d.live ? d.vals.find(v => v[0].startsWith(k)) : null; return e ? e[1] : null; };
+      const v = val('Bus voltage'), c = val('Current');
+      $('h'+i).classList.toggle('on', on);
+      $('hs'+i).textContent = on ? `ON · ${Math.ceil(lastOut.left[i]/1000)} s` : 'OFF';
+      $('hv'+i).textContent = v === null ? 'n/a' : v.toFixed(2) + ' V';
+      $('hi'+i).textContent = c === null ? 'n/a' : c.toFixed(0);
+      $('hb'+i).textContent = on ? 'Turn OFF' : 'Turn ON'; $('hb'+i).classList.toggle('on', on);
+      $('hn'+i).textContent = !d || !d.live ? 'INA monitor not responding' :
+        on && v !== null && v < 1 ? 'ON but no voltage: is VBAT connected / e-fuse on?' : '';
+    });
+    $('fuse').textContent = lastOut.inhibit ? 'E-fuse: INHIBITED (forced off) — click to release' : 'E-fuse: released (board decides) — click to inhibit';
+  }
+  updateControls();
+}
+updateControls();
+
+// ---------------------------------------------------------------- Web Serial
+async function connect(){
+  if (!('serial' in navigator)) { alert('Web Serial needs Chrome or Edge.'); return; }
+  try {
+    stopDemo();
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    $('conn').textContent = 'Connected'; $('connect').textContent = 'Disconnect';
+    lastRx = Date.now();
+    const dec = new TextDecoderStream();
+    port.readable.pipeTo(dec.writable).catch(() => {});
+    reader = dec.readable.getReader();
+    let buf = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        if (line[0] === '{') { try { render(JSON.parse(line)); } catch (e) {} }
+      }
+    }
+  } catch (e) {
+    $('conn').textContent = 'Error: ' + e.message;
+  }
+  await disconnect(true);
+}
+async function disconnect(quiet){
+  try { if (reader) await reader.cancel(); } catch (e) {}
+  try { if (port) await port.close(); } catch (e) {}
+  reader = null; port = null;
+  $('connect').textContent = 'Connect board';
+  if (!quiet || $('conn').textContent === 'Connected') $('conn').textContent = 'Disconnected';
+}
+$('connect').onclick = () => port ? disconnect() : connect();
+
+// ---------------------------------------------------------------- server mode (served by bridge.py over http)
+if (location.protocol.startsWith('http')) {
+  $('connect').style.display = 'none';
+  $('conn').textContent = 'Live via local server';
+  lastRx = Date.now();
+  port = {};   // enables the stale-data banner
+  const es = new EventSource('/events');
+  es.onmessage = e => { try { render(JSON.parse(e.data)); } catch (x) {} };
+  es.onerror = () => showBanner('Lost connection to the local server (is bridge.py running?)');
+}
+
+// ---------------------------------------------------------------- demo data
+function stopDemo(){ if (demoTimer) { clearInterval(demoTimer); demoTimer = null; $('demo').textContent = 'Demo data'; } }
+$('demo').onclick = () => {
+  if (demoTimer) { stopDemo(); return; }
+  const mk = (bus, addr, ref, name, vals, live=true, ok=true, note='') => ({bus, addr, ref, name, live, ok, note, vals});
+  let n = 0;
+  const tick = () => {
+    n++;
+    const r = Math.random;
+    const ina = (b,a,ref,nm) => mk(b,a,ref,nm,[['Bus voltage (V)',24.1+r()*.1],['Current (mA)',r()*20],['Die temp (C)',28+r()]]);
+    const ps = (b,a,ref) => mk(b,a,ref,'Pressure sensor',[['Pressure (psi)',14.7+r()*.2],['Temperature (C)',24+r()],['Status (0=ok)',0]]);
+    const unplugged = (n % 12) > 6;
+    m = {t:n*1000, stuck:[false,false], unexpected:[], gpio:[['DRV nFAULT',1],['FUSE_FLT',1],['FUSE_PG',1],['ALERT REG',1]],
+      devs:[ps(0,0x28,'U14'), ina(0,0x40,'U9','INA740 REG heater'), ina(0,0x41,'U12','INA740 NOZZLE heater'),
+        mk(0,0x44,'U4','SHT45 temp/RH',[['Temperature (C)',23+r()],['Humidity (%RH)',40+r()*2]]),
+        ina(0,0x45,'U16','INA740 EXTRA heater 4'),
+        mk(0,0x48,'U11','ADS7828 ADC mux',['CH0 REG_THERM','CH1 NOZZLE_THERM','CH2 EXTRA_THERM1','CH3 EXTRA_THERM2','CH4 EXTRA_THERM3','CH5 EXTRA_THERM4','CH6 FUSE_IMON','CH7 FUSE_TEMP'].map(k=>[k,1.6+r()*.05])),
+        mk(0,0x50,'U5','24AA02UID EEPROM',[['Mfr code (0x29 ok)',41],['Device code (0x41 ok)',65],['UID (32-bit, dec)',305419896]]),
+        unplugged ? mk(1,8,'J6','Flow sensor',[],false,false) : mk(1,8,'J6','Flow sensor',[['Flow (ml/min)',r()*2],['Temperature (C)',22+r()]]),
+        ps(1,0x28,'U17'), ina(1,0x40,'U15','INA740 EXTRA heater 1'), ina(1,0x41,'U10','INA740 EXTRA heater 2'), ina(1,0x44,'U13','INA740 EXTRA heater 3')]};
+    render(m);
+  };
+  let m; tick(); demoTimer = setInterval(tick, 1000);
+  $('demo').textContent = 'Stop demo'; $('conn').textContent = 'Demo mode (flow sensor unplugs every few s)';
+};
+</script>
+</body>
+</html>

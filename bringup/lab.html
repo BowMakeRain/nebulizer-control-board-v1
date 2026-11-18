@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nebulizer PCB V1 Test GUI</title>
+<style>
+:root{--rm-forest:#1C2C26;--rm-pine:#103D1D;--rm-grassland:#275F4B;--rm-sage:#628C7D;--rm-bronze:#DABA89;--rm-grain:#FFF1CF;--rm-ice:#BAF7FF;--rm-mist:#F5F5F1;--rm-cloud:#E0DED7;--rm-obsidian:#030200;--rm-hi-vis:#E5FF42;--bg:var(--rm-forest);--card:var(--rm-pine);--card2:var(--rm-grassland);--text:var(--rm-mist);--mute:var(--rm-cloud);--line:var(--rm-grassland);--ok:var(--rm-ice);--okbg:rgba(186,247,255,.16);--warn:var(--rm-bronze);--warnbg:rgba(218,186,137,.16);--bad:#ff5a52;--badbg:rgba(255,90,82,.16);--acc:var(--rm-bronze);--accfg:var(--rm-obsidian);--hv:var(--rm-hi-vis);--sage:var(--rm-sage);--grass:var(--rm-grassland);--grain:var(--rm-grain);--c1:var(--rm-bronze);--c2:var(--rm-ice);--c3:var(--rm-sage);--c4:var(--rm-grain)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 Inter,'Helvetica Neue',Arial,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:10px 18px;background:var(--rm-obsidian);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+nav{display:flex;gap:4px;padding:8px 18px 0;border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{background:none;border:0;border-bottom:3px solid transparent;border-radius:0;color:var(--mute);padding:9px 14px;font:inherit;cursor:pointer}
+nav button.on{color:var(--grain);border-color:var(--hv)}
+.sec{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--grain);margin:6px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.ctrl{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;margin-bottom:22px}
+@media(max-width:1000px){.ctrl{grid-template-columns:1fr}}
+.dot.warn{background:var(--warn)}
+.tab{display:none}.tab.on{display:block}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}
+.card input[type=number],.card input[type=text],.card select{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.card input.lt,.card select.lt,#canc input,#canc select,#motc input[type=number],#motc select,#motc input[type=text]{background:var(--rm-mist);color:var(--rm-obsidian);border:1px solid var(--sage)}
+h1{font-size:16px;margin:0 6px 0 0;white-space:nowrap;color:var(--grain)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--bad);display:inline-block}.dot.ok{background:var(--ok)}
+button,select,input{font:inherit;color:var(--text)}
+button{padding:7px 13px;border-radius:8px;border:1px solid var(--sage);background:var(--grass);color:var(--text);font-weight:600;cursor:pointer}
+button:hover{background:var(--rm-sage);color:var(--rm-obsidian)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.stop{background:var(--rm-obsidian);border-color:var(--bad);color:var(--rm-mist);font-weight:700}
+button.rec.on{background:var(--bad);border-color:var(--bad);color:var(--rm-mist)}
+button.act{background:var(--acc);border-color:var(--acc);color:var(--accfg)}
+.sp{flex:1}
+.mute{color:var(--mute)} .mono{font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+label.sw{display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line);padding:4px 10px;background:transparent;font-weight:500}.seg button:last-child{border:0}
+.seg button.sel{background:var(--acc);color:var(--accfg)}
+main{padding:16px 18px 40px;max-width:1500px;margin:0 auto}
+.row{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:900px){.row{grid-template-columns:1fr}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h3{margin:0;font-size:15px;color:var(--grain);font-weight:650;display:flex;align-items:center;gap:8px}
+.pill{font-size:11px;font-weight:700;padding:1px 8px;border-radius:9px;background:var(--line);color:var(--mute)}
+.pill.pid{background:var(--okbg);color:var(--ok)}.pill.man{background:var(--warnbg);color:var(--warn)}.pill.trip{background:var(--badbg);color:var(--bad)}
+.hcard.on{border-left:4px solid var(--ok)}.hcard.trip{border-left:4px solid var(--bad)}
+.big{display:flex;gap:14px;margin:6px 0;flex-wrap:wrap}
+.big div{min-width:62px}.big b{display:block;font-size:19px;font-weight:600}.big span{font-size:10px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.small{display:flex;gap:12px;flex-wrap:wrap;color:var(--mute);font-size:12px;margin-bottom:4px}
+.small b{color:var(--text);font-weight:600}
+.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:4px 8px;margin:6px 0;align-items:end}
+.inputs .wide{grid-column:span 3}
+.inputs .slr{display:flex;gap:8px;align-items:center}.inputs .slr input[type=range]{flex:1;padding:0}.inputs .slr input[type=number]{width:70px}
+details.lim{margin-top:4px;font-size:11px;color:var(--mute)}details.lim summary{cursor:pointer}
+.hide{display:none!important}
+.inputs label{font-size:10px;color:var(--mute);text-transform:uppercase}
+.inputs input{width:100%;padding:3px 5px;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+canvas{display:block;width:100%}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.tile b{font-size:18px;display:block}.tile span{font-size:10px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;gap:6px;align-items:center;padding:3px 9px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:12px}
+.chip.bad{border-color:var(--bad);color:var(--bad)}.chip.warn{border-color:var(--warn);color:var(--warn)}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:16px 0 6px}
+#banner{display:none;margin-bottom:10px;padding:8px 12px;border-radius:6px;background:var(--badbg);color:var(--bad);border:1px solid var(--bad)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Nebulizer PCB V1 Test GUI</h1>
+  <span class="dot" id="link"></span><span class="mute mono" id="up">—</span>
+  <span class="sp"></span>
+  <span class="seg" id="win"><button data-w="60">1m</button><button data-w="300" class="sel">5m</button><button data-w="1200">20m</button><button data-w="0">all</button></span>
+  <button id="rec" class="rec">● REC</button><span class="mono mute" id="recinfo"></span>
+  <label class="sw"><input type="checkbox" id="arm"> ARM</label>
+  <button id="alloff" class="stop">ALL OFF</button>
+  <button id="fuse" title="ON: FUSE_EN driven high (e-fuse on). CUT: FUSE_EN low, e-fuse off (VBAT_PROTECTED: heaters, 24 V boost, INA bus).">Power</button>
+  <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select id="cfgsel" style="background:var(--rm-mist);color:var(--rm-obsidian);border:1px solid var(--sage);border-radius:7px;padding:6px 8px;max-width:160px"></select>
+    <button id="cfgload">Load</button><button id="cfgsave">Save</button><button id="cfgdel">Del</button>
+    <label class="sw" title="Apply the selected config each time the board starts or this page connects (settings only, nothing is turned on)"><input type="checkbox" id="cfgauto"> auto</label></span>
+</header>
+<nav id="tabs"><button data-t="live" class="on">Live</button><button data-t="can">CAN</button><button data-t="status">Status</button></nav>
+<main>
+  <div id="banner"></div>
+  <section class="tab on" data-tab="live">
+  <h2 class="sec">Controls</h2>
+  <div class="ctrl">
+    <div class="card" id="solc">
+      <h3>Solenoid <span class="pill" id="solst">OFF</span>
+        <span style="margin-left:auto;display:flex;gap:8px"><button id="sol_on">ON</button><button id="sol_off" class="stop">OFF</button></span></h3>
+      <div style="margin-top:10px"><h3 style="font-size:13px;color:var(--mute)">Pressure <span class="mute">psi</span> <span id="pbig" class="mono" style="margin-left:auto;font-size:28px;font-weight:700;color:var(--rm-mist)"></span></h3><div id="pplot"></div></div>
+    </div>
+  <div class="card" id="motc">
+    <h3>Motor <span class="mute" id="motst"></span></h3>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;margin:10px 0">
+      <div><label class="mute">nSLEEP</label><br><select id="m_sleep"><option value="0">sleep</option><option value="1">awake</option></select></div>
+      <div><label class="mute">ENABLE</label><br><select id="m_en"><option value="0">off</option><option value="1">on</option><option value="2">on, Hi-Z (×8 stall)</option></select></div>
+      <div><label class="mute">DIR</label><br><select id="m_dir"><option value="0">0</option><option value="1">1</option></select></div>
+      <div><label class="mute">STL_MODE</label><br><select id="m_stl"><option value="0">torque count</option><option value="1">threshold</option><option value="2">learning</option></select></div>
+      <div><label class="mute" title="Off holds STL_REP low so the driver never faults on a stall. On lets it flag stalls (needs learning first).">Stall detect</label><br><select id="m_sd"><option value="1">off</option><option value="0">on</option></select></div>
+      <div><label class="mute">Speed (rpm)</label><br><input type="range" id="m_hzs" min="0" max="1000" step="5" value="0" style="width:180px"> <input type="number" id="m_hz" min="0" step="any" value="0" style="width:84px"></div>
+      <div><label class="mute">Accel (rpm/s)</label><br><input type="number" id="m_acc" value="500" style="width:84px"></div>
+      <div><label class="mute">µsteps</label><br><select id="m_us"><option>1</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option><option>64</option><option>128</option><option>256</option></select></div>
+      <div><label class="mute">steps/rev</label><br><input type="number" id="m_spr" value="200" style="width:64px"></div>
+      <div><label class="mute">lead (mm/rev)</label><br><input type="number" id="m_lead" value="0.6096" step="any" style="width:84px"></div>
+      <div><button id="m_run">Run</button> <button id="m_stop" class="stop">Stop</button> <button id="m_clr">Clear fault</button></div>
+    </div>
+    <div class="big" style="display:flex;gap:18px;flex-wrap:wrap" id="m_read"></div>
+    <div class="mute" style="font-size:11px;margin-top:6px">M0, M1 (step mode) and VREF are set by resistors R29–R32 / R13–R14, not MCU nets. Match µsteps to the populated resistors. VREF ≈ 0.58 V → ~0.44 A (if DVDD = 5 V).</div>
+  </div>
+  </div>
+  <h2 class="sec">Heaters <span class="mute" style="font-weight:400;text-transform:none;letter-spacing:0">6 channels · each runs on its own thermistor</span></h2>
+  <div class="grid" id="heaters"></div>
+  </section>
+  <section class="tab" data-tab="status">
+  <div class="card" id="st_alerts"></div>
+  <div class="grid" id="stgrid" style="margin-top:12px">
+    <div class="card"><h3>Power</h3><div class="chips" id="st_power"></div></div>
+    <div class="card"><h3>Heaters</h3><div class="chips" id="st_heat"></div></div>
+    <div class="card"><h3>Thermistors</h3><div class="chips" id="st_therm"></div></div>
+    <div class="card"><h3>Motor</h3><div class="chips" id="st_motor"></div></div>
+    <div class="card"><h3>Solenoid &amp; pressure</h3><div class="chips" id="st_sol"></div></div>
+    <div class="card"><h3>Sensors &amp; I2C</h3><div class="chips" id="st_i2c"></div></div>
+  </div>
+  <div class="card" style="margin-top:12px"><h3>Readings</h3><div class="tiles" id="tiles" style="margin-top:8px;grid-template-columns:repeat(auto-fill,minmax(120px,1fr))"></div></div>
+  <div class="card" style="margin-top:12px">
+    <h3>Sampling rates <span class="mute" id="ratehdr"></span></h3>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;margin:8px 0">
+      <div><label class="mute">I2C clock</label><br><select id="sm_i2c" style="background:var(--rm-mist);color:var(--rm-obsidian);border:1px solid var(--sage);border-radius:7px;padding:6px 8px"><option value="100">100 kHz</option><option value="400">400 kHz (max for pressure sensors)</option><option value="1000">1000 kHz (pressure sensors fail)</option></select></div>
+      <div><label class="mute">Frame period</label><br><select id="sm_tr" style="background:var(--rm-mist);color:var(--rm-obsidian);border:1px solid var(--sage);border-radius:7px;padding:6px 8px"><option value="0">max</option><option value="50">50 ms</option><option value="100">100 ms</option><option value="250">250 ms</option><option value="1000">1 s</option></select></div>
+      <div><label class="mute">Thermistor / PID loop</label><br><select id="sm_ct" style="background:var(--rm-mist);color:var(--rm-obsidian);border:1px solid var(--sage);border-radius:7px;padding:6px 8px"><option value="10">10 ms</option><option value="20">20 ms</option><option value="50">50 ms</option><option value="100">100 ms</option></select></div>
+    </div>
+    <div id="rates"></div>
+  </div>
+  <div class="mute mono" id="sys" style="margin-top:10px"></div>
+  <div style="margin-top:14px"><a href="#" id="demo" class="mute">demo</a></div>
+  </section>
+  <section class="tab" data-tab="can">
+  <div class="card" id="canc">
+    <h3>CAN <span class="mute" id="canst"></span></h3>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0">
+      <select id="cankb"><option>25</option><option>50</option><option>100</option><option>125</option><option>250</option><option selected>500</option><option>800</option><option>1000</option></select> kbps
+      <select id="canmode"><option value="0">normal</option><option value="1">listen</option><option value="2">self-test</option></select>
+      <button id="canapply">Apply</button><button id="canoff">Off</button>
+      <span class="mute">TX</span> <input id="canid" value="123" size="4" class="mono" title="ID hex"> <input id="candata" value="DEADBEEF" size="18" class="mono" title="data hex, up to 8 bytes">
+      <button id="cansend">Send</button>
+    </div>
+    <div class="mono mute" id="canlog" style="font-size:12px;white-space:pre"></div>
+  </div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === b.dataset.t));
+  try { localStorage.setItem('tab', b.dataset.t); } catch (_) {}
+  window.dispatchEvent(new Event('resize'));
+});
+try { const t = localStorage.getItem('tab'); const b = t && document.querySelector(`#tabs button[data-t="${t}"]`); if (b) b.click(); } catch (_) {}
+const hex = a => '0x' + a.toString(16).toUpperCase().padStart(2, '0');
+const serverMode = location.protocol.startsWith('http');
+const RXH = [];   // [ms, smp counters, board t]
+let hist = [], win = 300, last = null, lastRx = 0, demo = null;
+
+const HT = [
+  {k:'reg',    name:'REG',    j2:3,  ina:[0,0x40]},
+  {k:'nozzle', name:'NOZZLE', j2:1,  ina:[0,0x41]},
+  {k:'extra1', name:'EXTRA 1',j2:8,  ina:[1,0x40]},
+  {k:'extra2', name:'EXTRA 2',j2:12, ina:[1,0x41]},
+  {k:'extra3', name:'EXTRA 3',j2:10, ina:[1,0x44]},
+  {k:'extra4', name:'EXTRA 4',j2:5,  ina:[0,0x45]},
+];
+const dev = (m, bus, addr) => m.devs.find(d => d.bus === bus && d.addr === addr);
+const dval = (d, key) => { const e = d && d.live ? d.vals.find(v => v[0].startsWith(key)) : null; return e ? e[1] : null; };
+const f = (v, n = 1, u = '') => (v === null || v === undefined || !isFinite(v)) ? '—' : v.toFixed(n) + u;
+
+function sendCmd(c) {
+  if (demo) return demoCmd(c);
+  if (serverMode) fetch('/cmd', {method:'POST', headers:{'X-Requested-With':'dashboard'}, body:c}).catch(() => {});
+}
+
+// ------------------------------------------------------------------ plots
+function lowerBound(a, x) { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; a[m].ts < x ? lo = m + 1 : hi = m; } return lo; }
+function niceTicks(lo, hi, n = 4) {
+  if (!(hi > lo)) hi = lo + 1;
+  const step0 = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(step0))), nm = step0 / mag;
+  const step = (nm < 1.5 ? 1 : nm < 3 ? 2 : nm < 7 ? 5 : 10) * mag, out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toPrecision(10));
+  return out;
+}
+class Plot {
+  constructor(el, h, series, opt = {}) {
+    this.el = el; this.h = h; this.s = series; this.o = opt;
+    this.cv = document.createElement('canvas'); el.appendChild(this.cv);
+  }
+  draw() {
+    const W = this.el.clientWidth, Ht = this.h, dpr = window.devicePixelRatio || 1;
+    if (!W) return;
+    const c = this.cv;
+    if (c.width !== Math.round(W * dpr) || c.height !== Math.round(Ht * dpr)) { c.width = Math.round(W * dpr); c.height = Ht * dpr; c.style.height = Ht + 'px'; }
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, Ht);
+    const cs = getComputedStyle(document.documentElement), grid = cs.getPropertyValue('--line'), txt = cs.getPropertyValue('--mute');
+    const hasR = this.s.some(s => s.axis === 'r'), big = !!this.o.big, ml = big ? 66 : 44, mr = hasR ? 40 : 8, mt = big ? 10 : 6, mb = big ? 24 : 16, pw = W - ml - mr, ph = Ht - mt - mb;
+    const now = hist.length ? hist[hist.length - 1].ts : 0;
+    const x0 = win ? now - win : (hist.length ? hist[0].ts : now - 1), x1 = now > x0 ? now : x0 + 1;
+    const i0 = lowerBound(hist, x0);
+    const rng = {l: [Infinity, -Infinity], r: [Infinity, -Infinity]};
+    for (const s of this.s) for (let i = i0; i < hist.length; i++) {
+      const v = s.get(hist[i].m);
+      if (v !== null && isFinite(v)) { const r = rng[s.axis || 'l']; if (v < r[0]) r[0] = v; if (v > r[1]) r[1] = v; }
+    }
+    const fixR = this.o.rFixed;
+    const fin = (r, fixed, minSpan) => {
+      if (fixed) return fixed;
+      let [lo, hi] = r; if (!isFinite(lo)) return [0, 1];
+      if (hi - lo < minSpan) { const mid = (hi + lo) / 2; lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
+      const p = (hi - lo) * 0.08; return [lo - p, hi + p];
+    };
+    const yl = fin(rng.l, null, this.o.minSpan || 1), yr = fin(rng.r, fixR, 1);
+    const X = t => ml + (t - x0) / (x1 - x0) * pw;
+    const Y = (v, ax) => { const [lo, hi] = ax === 'r' ? yr : yl; return mt + ph - (v - lo) / (hi - lo) * ph; };
+    g.font = (big ? '600 16px' : '10px') + ' -apple-system,system-ui,sans-serif'; g.lineWidth = 1;
+    g.strokeStyle = grid; g.fillStyle = big ? '#F5F5F1' : txt; g.textAlign = 'right'; g.textBaseline = 'middle';
+    for (const t of niceTicks(yl[0], yl[1])) { const y = Y(t, 'l'); g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.fillText(+t.toFixed(2), ml - 4, y); }
+    if (hasR) {
+      g.textAlign = 'left';
+      const rs = this.s.find(s => s.axis === 'r'); g.fillStyle = big ? '#F5F5F1' : cs.getPropertyValue(rs.color);
+      for (const t of niceTicks(yr[0], yr[1], 3)) g.fillText(+t.toFixed(1), ml + pw + 4, Y(t, 'r'));
+    }
+    g.fillStyle = big ? '#F5F5F1' : txt; g.textAlign = 'left'; g.textBaseline = 'top';
+    g.fillText(win ? '−' + (win >= 60 ? win / 60 + ' min' : win + ' s') : '−' + Math.round(x1 - x0) + ' s', ml, Ht - (big ? 18 : 12));
+    g.textAlign = 'right'; g.fillText('now', ml + pw, Ht - (big ? 18 : 12));
+    g.save(); g.beginPath(); g.rect(ml, mt, pw, ph); g.clip();
+    for (const s of this.s) {
+      g.strokeStyle = cs.getPropertyValue(s.color); g.lineWidth = 1.6; g.setLineDash(s.dash ? [5, 4] : []);
+      g.beginPath(); let pen = false;
+      for (let i = i0; i < hist.length; i++) {
+        const v = s.get(hist[i].m);
+        if (v === null || !isFinite(v)) { pen = false; continue; }
+        const x = X(hist[i].ts), y = Y(v, s.axis || 'l');
+        pen ? g.lineTo(x, y) : g.moveTo(x, y); pen = true;
+      }
+      g.stroke();
+    }
+    g.restore(); g.setLineDash([]);
+    let lx = ml + 6; g.textBaseline = 'top'; g.textAlign = 'left';
+    if (!big) for (const s of this.s) {
+      const v = hist.length ? s.get(hist[hist.length - 1].m) : null, col = cs.getPropertyValue(s.color);
+      g.fillStyle = col; g.fillRect(lx, mt + 4, 8, 8);
+      const label = s.name + ' ' + f(v, s.dec ?? 2);
+      g.fillStyle = txt; g.fillText(label, lx + 12, mt + 3); lx += 18 + g.measureText(label).width + 8;
+    }
+  }
+}
+
+// ------------------------------------------------------------------ build UI
+const plots = [];
+const pressPlot = new Plot($('pplot'), 240, [
+  {name:'P0', color:'--c2', get: m => dval(dev(m,0,0x28), 'Pressure (psi)'), dec:2},
+  {name:'P1', color:'--c3', get: m => dval(dev(m,1,0x28), 'Pressure (psi)'), dec:2},
+], {minSpan: 0.5, big: true});
+plots.push(pressPlot);
+
+const INP = [['sp','SP °C','sp_c'],['man','Duty %','man_pct'],['kp','Kp','kp'],['ki','Ki','ki'],
+             ['kd','Kd','kd'],['hz','PWM Hz','freq_hz'],['md','Max %','maxduty_pct'],['mt','Max °C','maxT_c']];
+const num = (id, lab, i, f, extra = '') => `<div><label>${lab}</label><input type="number" step="any" id="${id}${i}" data-i="${i}" data-f="${f}" ${extra}></div>`;
+$('heaters').innerHTML = HT.map((h, i) => `
+<div class="card hcard" id="c${i}">
+  <h3>${h.name} <span class="mute">J2.${h.j2}</span><span class="pill" id="st${i}">OFF</span>
+    <span class="sp"></span><span class="seg" id="md${i}"><button data-m="0">OFF</button><button data-m="1">MAN</button><button data-m="2">PID</button></span></h3>
+  <div class="big"><div><b id="T${i}">—</b><span>°C</span></div><div id="Sw${i}"><b id="S${i}">—</b><span>SP</span></div>
+    <div><b id="D${i}">—</b><span>%</span></div><div><b id="V${i}">—</b><span>V</span></div>
+    <div><b id="I${i}">—</b><span>mA</span></div><div><b id="W${i}">—</b><span>W</span></div></div>
+  <div id="pl${i}"></div>
+  <div class="inputs" id="pidin${i}">${num('in_sp', 'SP °C', i, 'sp')}${num('in_kp', 'Kp', i, 'kp')}${num('in_ki', 'Ki', i, 'ki')}${num('in_kd', 'Kd', i, 'kd')}${num('in_hzp', 'Hz', i, 'hz')}</div>
+  <div class="inputs" id="manin${i}"><div class="wide"><label>Duty %</label><div class="slr"><input type="range" min="0" max="30" step="0.5" id="sl${i}" data-i="${i}" data-f="duty"><input type="number" step="any" id="in_duty${i}" data-i="${i}" data-f="duty"></div></div>${num('in_hzm', 'Hz', i, 'hz')}</div>
+  <details class="lim"><summary>limits</summary><div class="inputs">${num('in_md', 'Max %', i, 'md')}${num('in_mt', 'Max °C', i, 'mt')}</div></details>
+  <div class="small"><span id="pidt${i}"></span><span id="note${i}"></span><button id="clr${i}" class="hide">Clear</button></div>
+</div>`).join('');
+
+HT.forEach((h, i) => {
+  const hp = new Plot($('pl' + i), 130, [
+    {name:'T', color:'--c1', get: m => m.htr[i].T_c, dec:1},
+    {name:'SP', color:'--mute', get: m => m.htr[i].mode === 2 ? m.htr[i].sp_c : null, dash:true, dec:1},
+    {name:'duty%', color:'--c2', axis:'r', get: m => m.htr[i].duty_pct, dec:1},
+  ], {rFixed:[0,100], minSpan:2});
+  plots.push(hp);
+});
+
+function redraw() { plots.forEach(p => p.draw()); }
+window.addEventListener('resize', redraw);
+window.addEventListener('load', redraw);
+$('win').onclick = e => { const b = e.target.closest('button'); if (!b) return; win = +b.dataset.w;
+  [...$('win').children].forEach(x => x.classList.toggle('sel', x === b)); redraw(); };
+
+// ------------------------------------------------------------------ controls
+let armTime = 0;
+$('arm').onchange = () => { armTime = Date.now(); sendCmd('ARM,' + ($('arm').checked ? 1 : 0)); if (!$('arm').checked) sendCmd('OFF'); refreshEnable(); };
+$('alloff').onclick = () => { sendCmd('OFF'); $('arm').checked = false; armTime = Date.now(); sendCmd('ARM,0'); refreshEnable(); };
+$('canapply').onclick = () => sendCmd('CAN,' + $('cankb').value + ',' + $('canmode').value);
+$('canoff').onclick = () => sendCmd('CAN,0');
+$('cansend').onclick = () => sendCmd('CANT,' + $('canid').value.replace(/[^0-9a-fA-F]/g, '').slice(0, 3) + ',' + $('candata').value.replace(/[^0-9a-fA-F]/g, '').slice(0, 16));
+$('fuse').onclick = () => sendCmd('FUSE,' + (last && last.sys.inhibit ? 0 : 1));
+$('rec').onclick = () => sendCmd(last && last._host && last._host.log.on ? 'LOG,stop' : 'LOG,start');
+HT.forEach((h, i) => {
+  $('md' + i).onclick = e => { const b = e.target.closest('button'); if (!b || b.disabled) return; if (b.dataset.m !== '0') view[i] = b.dataset.m === '1' ? 'man' : 'pid'; setView(i); sendCmd(`M,${i},${b.dataset.m}`); };
+  $('clr' + i).onclick = () => sendCmd('C,' + i);
+});
+const view = HT.map(() => 'pid');             // which input set to show while a heater is OFF
+const gv = (id, i) => parseFloat($(`${id}${i}`).value);
+let lastDuty = 0, sliding = false;
+function setView(i) {
+  const m = last ? last.htr[i].mode : 0, v = m === 1 ? 'man' : m === 2 ? 'pid' : view[i];
+  view[i] = v;
+  $('pidin' + i).classList.toggle('hide', v !== 'pid'); $('manin' + i).classList.toggle('hide', v !== 'man');
+}
+document.addEventListener('pointerdown', e => { if (e.target.type === 'range') sliding = true; });
+document.addEventListener('pointerup', () => { sliding = false; });
+document.addEventListener('input', e => {       // slider drag: mirror to the box, send at most every 150 ms
+  const t = e.target; if (t.type !== 'range') return;
+  const i = +t.dataset.i; $('in_duty' + i).value = t.value;
+  if (Date.now() - lastDuty > 150) { lastDuty = Date.now(); sendCmd(`D,${i},${t.value}`); }
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || t.dataset.f === undefined) return;
+  const i = +t.dataset.i, v = parseFloat(t.value);
+  if (!isFinite(v)) return;
+  switch (t.dataset.f) {
+    case 'sp': sendCmd(`S,${i},${v}`); break;
+    case 'duty': $('sl' + i).value = v; sendCmd(`D,${i},${v}`); break;
+    case 'hz': sendCmd(`F,${i},${Math.round(v)}`); break;
+    case 'kp': case 'ki': case 'kd': sendCmd(`G,${i},${gv('in_kp', i)},${gv('in_ki', i)},${gv('in_kd', i)}`); break;
+    case 'md': case 'mt': sendCmd(`X,${i},${gv('in_md', i)},${gv('in_mt', i)}`); break;
+  }
+});
+function refreshEnable() {
+  const armed = $('arm').checked, ok = (serverMode || demo) && last;
+  $('arm').disabled = !ok; $('alloff').disabled = !ok; $('fuse').disabled = !ok; $('rec').disabled = !ok;
+  HT.forEach((h, i) => [...$('md' + i).children].forEach(b => b.disabled = !ok || (b.dataset.m !== '0' && !armed)));
+  $('sol_on').disabled = !ok || !armed; $('sol_off').disabled = !ok; $('m_run').disabled = !ok || !armed;
+  $('sol_on').title = $('m_run').title = armed ? '' : 'ARM first';
+}
+
+// ------------------------------------------------------------------ render
+const TRIPS = {1:'OVER-TEMP', 2:'NO SENSOR', 3:'HOST LOST'};
+
+
+// ---- saved configs (stored by the bridge in configs.json, so they survive browser/board resets)
+let cfgs = {configs: {}, auto: null}, cfgLoaded = false, cfgApplied = false, lastBoardT = 1e12;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function cfgRefreshUI() {
+  const sel = $('cfgsel'), cur = sel.value, names = Object.keys(cfgs.configs).sort();
+  sel.innerHTML = names.length ? names.map(n => `<option${n === cfgs.auto ? ' selected' : ''}>${n.replace(/</g, '&lt;')}</option>`).join('') : '<option value="">(no configs)</option>';
+  if (names.includes(cur)) sel.value = cur;
+  $('cfgauto').checked = !!cfgs.auto && cfgs.auto === sel.value;
+}
+async function cfgLoadFile() {
+  try { const r = await fetch('/configs'); if (r.ok) cfgs = Object.assign({configs: {}, auto: null}, await r.json()); } catch (_) {}
+  cfgLoaded = true; cfgRefreshUI();
+}
+async function cfgSaveFile() {
+  if (serverMode) { try { await fetch('/configs', {method: 'POST', headers: {'X-Requested-With': 'dashboard'}, body: JSON.stringify(cfgs)}); } catch (_) {} }
+  cfgRefreshUI();
+}
+function cfgCollect() {
+  const m = last;
+  return {
+    heaters: m.htr.map(h => ({sp: h.sp_c, kp: h.kp, ki: h.ki, kd: h.kd, hz: h.freq_hz, maxduty: h.maxduty_pct, maxT: h.maxT_c, man: h.man_pct})),
+    motor: m.mot ? {dir: m.mot.dir, stl: m.mot.stl, rpm: +$('m_hz').value || 0, accel_rpm: +$('m_acc').value || 500, us: $('m_us').value, spr: $('m_spr').value, lead: $('m_lead').value} : null,
+    can: m.can ? {kbps: m.can.kbps, mode: m.can.mode} : null,
+  };
+}
+async function cfgApply(c) {      // settings only: heater modes, power, solenoid and motor run state are never changed
+  const q = [];
+  (c.heaters || []).forEach((h, i) => {
+    q.push(`S,${i},${h.sp}`, `G,${i},${h.kp},${h.ki},${h.kd}`, `F,${i},${h.hz}`, `X,${i},${h.maxduty},${h.maxT}`, `D,${i},${h.man}`);
+  });
+  if (c.motor) {
+    const mo = c.motor;
+    $('m_us').value = mo.us; $('m_spr').value = mo.spr; if (mo.lead) $('m_lead').value = mo.lead;
+    const rpm = mo.rpm ?? 0, acc = mo.accel_rpm ?? 500;
+    $('m_hz').value = rpm; $('m_hzs').value = Math.min(rpm, +$('m_hzs').max); $('m_acc').value = acc;
+    try { localStorage.setItem('m_us', mo.us); localStorage.setItem('m_spr', mo.spr); if (mo.lead) localStorage.setItem('m_lead', mo.lead); } catch (_) {}
+    q.push(`MD,${mo.dir}`, `ML,${mo.stl}`, `MA,${rpmHz(acc).toFixed(1)}`);
+    if (last && last.mot && last.mot.sleep && last.mot.en) q.push(`MS,${rpmHz(rpm).toFixed(2)}`);   // already running: update speed; otherwise Run sends it
+  }
+  if (c.can) q.push(`CAN,${c.can.kbps},${c.can.mode}`);
+  for (const c1 of q) { sendCmd(c1); await sleep(45); }
+}
+$('cfgsel').onchange = () => cfgRefreshUI();
+$('cfgload').onclick = () => { const c = cfgs.configs[$('cfgsel').value]; if (c && last) cfgApply(c); };
+$('cfgsave').onclick = () => {
+  if (!last) return;
+  const name = (prompt('Save config as:', $('cfgsel').value || 'default') || '').trim().slice(0, 40);
+  if (!name) return;
+  cfgs.configs[name] = cfgCollect(); cfgRefreshUI(); $('cfgsel').value = name; cfgSaveFile();
+};
+$('cfgdel').onclick = () => {
+  const n = $('cfgsel').value; if (!n || !confirm('Delete config "' + n + '"?')) return;
+  delete cfgs.configs[n]; if (cfgs.auto === n) cfgs.auto = null; cfgSaveFile();
+};
+$('cfgauto').onchange = e => { cfgs.auto = e.target.checked ? ($('cfgsel').value || null) : null; cfgSaveFile(); };
+function cfgAutoCheck(m) {         // once per page load, and again whenever the board restarts
+  if (!cfgLoaded) return;
+  const restarted = m.t < lastBoardT; lastBoardT = m.t;
+  if ((!cfgApplied || restarted) && cfgs.auto && cfgs.configs[cfgs.auto]) { cfgApplied = true; setTimeout(() => cfgApply(cfgs.configs[cfgs.auto]), 1500); }
+  else if (!cfgApplied && !cfgs.auto) cfgApplied = true;
+}
+
+// ---- solenoid
+$('sol_on').onclick = () => sendCmd('SOL,1');
+$('sol_off').onclick = () => sendCmd('SOL,0');
+
+// ---- status page (grouped)
+function renderStatus(m) {
+  const alerts = [], G = n => { const g = m.gpio.find(x => x[0] === n); return g ? g[1] : null; };
+  const C = (grp, label, val, st, title) => {
+    if (st === 'bad' || st === 'warn') alerts.push([grp, label + (val !== undefined && val !== '' ? ' ' + val : ''), st]);
+    return `<span class="chip ${st === 'bad' ? 'bad' : st === 'warn' ? 'warn' : ''}" title="${title || ''}"><span class="dot ${st === 'ok' ? 'ok' : st === 'warn' ? 'warn' : st === 'bad' ? '' : 'ok'}"></span>${label}${val !== undefined && val !== '' ? ` <b>${val}</b>` : ''}</span>`;
+  };
+  const HL = v => v === null ? '—' : (v ? 'H' : 'L');
+  const dv = (b, a) => dev(m, b, a);
+  // Power
+  const fuseEn = G('FUSE_EN'), pgv = G('FUSE_PG'), flt = G('FUSE_FLT'), rail = dval(dv(0, 0x40), 'Bus voltage'), ads = dv(0, 0x48);
+  $('st_power').innerHTML =
+    C('Power', 'E-fuse EN', HL(fuseEn), fuseEn ? 'ok' : 'warn') + C('Power', 'PG', HL(pgv), pgv ? 'ok' : 'bad', 'power good') +
+    C('Power', 'FLT', flt ? 'ok' : 'FAULT', flt ? 'ok' : 'bad') +
+    C('Power', 'Rail', f(rail, 2, ' V'), rail !== null && rail > 20 ? 'ok' : 'bad', 'INA bus voltage (supply side of heater FET)') +
+    C('Power', 'Fuse I', f(dval(ads, 'CH6'), 3, ' V'), 'ok') + C('Power', 'Fuse T', f(dval(ads, 'CH7'), 3, ' V'), 'ok');
+  // Heaters
+  $('st_heat').innerHTML = m.htr.map((h, i) => {
+    const ina = dev(m, ...HT[i].ina), al = G('ALERT ' + h.k.toUpperCase()), v = dval(ina, 'Bus voltage');
+    const bad = h.trip || !ina || !ina.live || al === 0;
+    const txt = [h.trip ? 'TRIP ' + TRIPS[h.trip] : ['off', 'man', 'pid'][h.mode], ina && ina.live ? f(v, 1, ' V') : 'INA offline', 'ALERT ' + HL(al)].join(' · ');
+    return C('Heater', HT[i].name, txt, bad ? 'bad' : 'ok');
+  }).join('');
+  // Thermistors
+  $('st_therm').innerHTML = m.htr.map((h, i) => C('Therm', HT[i].name, h.T_ok ? f(h.T_c, 1, ' °C') : 'open/short', h.T_ok ? 'ok' : 'warn', 'ADC ' + h.adc_raw)).join('');
+  // Motor
+  const q = m.mot;
+  $('st_motor').innerHTML = q ? C('Motor', 'nFAULT', q.nfault ? 'ok' : 'FAULT', q.nfault ? 'ok' : 'bad') +
+    C('Motor', 'STL_REP', q.stl_dis ? 'off' : q.stl_rep ? (q.sleep && q.en && q.nfault ? 'stall' : 'high (not a stall)') : 'ok', !q.stl_dis && q.stl_rep && q.sleep && q.en && q.nfault ? 'bad' : 'ok', 'reads high while asleep, disabled or faulted (pull-up); a stall only counts when running with no fault') +
+    C('Motor', 'nSLEEP', q.sleep ? 'awake' : 'asleep', 'ok') + C('Motor', 'ENABLE', ['off', 'on', 'on Hi-Z'][q.en], 'ok') +
+    C('Motor', 'DIR', q.dir, 'ok') + C('Motor', 'STEP', f(q.hz, 0, ' Hz'), 'ok') + C('Motor', 'TRQ_CNT', q.trq_mv + ' mV', 'ok') : '<span class="mute">no data</span>';
+  // Solenoid & pressure
+  const p0 = dval(dv(0, 0x28), 'Pressure (psi)'), p1 = dval(dv(1, 0x28), 'Pressure (psi)');
+  $('st_sol').innerHTML = C('Solenoid', 'Solenoid', m.sol ? 'ON' : 'off', 'ok') +
+    C('Pressure', 'P0', f(p0, 2, ' psi'), dv(0, 0x28) && dv(0, 0x28).live ? 'ok' : 'bad') + C('Pressure', 'P1', f(p1, 2, ' psi'), dv(1, 0x28) && dv(1, 0x28).live ? 'ok' : 'bad');
+  // I2C devices (non-INA)
+  const inas = new Set(HT.map(h => h.ina.join(':')));
+  $('st_i2c').innerHTML = m.devs.filter(d => !inas.has(d.bus + ':' + d.addr)).map(d =>
+    C('I2C', d.ref, d.name.replace(/ sensor/, '') + ' · ' + d.bus + ':' + hex(d.addr), !d.live ? 'bad' : d.ok ? 'ok' : 'warn', d.note || '')).join('') +
+    m.unexpected.map(([b, a]) => C('I2C', 'extra', b + ':' + hex(a), 'warn')).join('') +
+    m.stuck.map((x, b) => x ? C('I2C', 'bus ' + b, 'stuck', 'bad') : '').join('');
+  // alerts summary
+  $('st_alerts').innerHTML = '<h3>Alerts</h3><div class="chips" style="margin-top:8px">' +
+    (alerts.length ? alerts.map(([g, t, st]) => `<span class="chip ${st === 'bad' ? 'bad' : 'warn'}"><b>${g}</b> ${t}</span>`).join('') : '<span class="chip"><span class="dot ok"></span>all clear</span>') + '</div>';
+}
+
+// ---- motor
+const mset = (id, v) => { const e = $(id); if (e && document.activeElement !== e) e.value = v; };
+let mThrottle = 0;
+const mSend = c => sendCmd(c);
+$('m_sleep').onchange = e => mSend('MP,' + e.target.value);
+$('m_en').onchange = e => mSend('ME,' + e.target.value);
+$('m_dir').onchange = e => mSend('MD,' + e.target.value);
+$('m_stl').onchange = e => mSend('ML,' + e.target.value);
+$('m_sd').onchange = e => mSend('MR,' + e.target.value);
+const mDiv = () => (+$('m_us').value || 1) * (+$('m_spr').value || 200) / 60;          // Hz per rpm
+const rpmHz = r => r * mDiv(), hzRpm = h => h / mDiv();
+const sendSpeed = () => mSend('MS,' + rpmHz(+$('m_hz').value || 0).toFixed(2));
+const sendAccel = () => mSend('MA,' + rpmHz(+$('m_acc').value || 500).toFixed(1));
+$('m_acc').onchange = sendAccel;
+$('m_hz').onchange = e => { $('m_hzs').value = Math.min(+e.target.value, +$('m_hzs').max); sendSpeed(); };
+$('m_hzs').oninput = e => { $('m_hz').value = e.target.value; const n = Date.now(); if (n - mThrottle > 150) { mThrottle = n; sendSpeed(); } };
+$('m_hzs').onchange = e => { $('m_hz').value = e.target.value; sendSpeed(); };
+$('m_run').onclick = () => { mSend('MP,1'); mSend('ME,' + ($('m_en').value === '2' ? 2 : 1)); sendAccel(); sendSpeed(); };
+$('m_stop').onclick = () => { mSend('MS,0'); };
+$('m_clr').onclick = () => mSend('MC');
+try { for (const k of ['m_us', 'm_spr', 'm_lead']) { const v = localStorage.getItem(k); if (v) $(k).value = v; } } catch (_) {}
+for (const k of ['m_us', 'm_spr', 'm_lead']) $(k).onchange = e => {
+  try { localStorage.setItem(k, e.target.value); } catch (_) {}
+  if (k !== 'm_lead') { sendAccel(); if (last && last.mot && last.mot.target_hz > 0) sendSpeed(); }   // keep the same rpm
+};
+function renderMotor(m) {
+  if (!m.mot) return;
+  const q = m.mot, rpm = hzRpm(q.hz), tgt = hzRpm(q.target_hz), lead = +$('m_lead').value || 0, mmps = rpm / 60 * lead;
+  mset('m_sleep', q.sleep); mset('m_en', q.en); mset('m_dir', q.dir); mset('m_stl', q.stl); mset('m_sd', q.stl_dis);
+  const near = (a, b) => Math.abs(a - b) <= 0.01 * Math.max(Math.abs(b), 1);
+  if (document.activeElement !== $('m_hz') && document.activeElement !== $('m_hzs') && !near(+$('m_hz').value, tgt)) { $('m_hz').value = +tgt.toFixed(1); $('m_hzs').value = Math.min(tgt, +$('m_hzs').max); }
+  if (document.activeElement !== $('m_acc') && !near(+$('m_acc').value, hzRpm(q.accel))) $('m_acc').value = +hzRpm(q.accel).toFixed(1);
+  $('motst').textContent = q.hz > 0 ? `${rpm.toFixed(1)} rpm · ${q.hz.toFixed(0)} Hz` : (q.sleep ? (q.en ? 'idle' : 'disabled') : 'asleep');
+  const B = (l, v, bad) => `<div style="min-width:70px"><b style="display:block;font-size:19px;font-weight:600;${bad ? 'color:var(--bad)' : ''}">${v}</b><span class="mute" style="font-size:10px;text-transform:uppercase">${l}</span></div>`;
+  $('m_read').innerHTML = B('rpm', rpm.toFixed(1)) + B('target rpm', tgt.toFixed(1)) + B('STEP Hz', q.hz.toFixed(0)) + (lead ? B('mm/s', mmps.toFixed(2)) : '') +
+    B('nFAULT', q.nfault ? 'ok' : 'FAULT', !q.nfault) + B('STL_REP', q.stl_dis ? 'off' : (q.stl_rep ? (q.sleep && q.en && q.nfault ? 'stall' : 'n/a') : '–'), !q.stl_dis && q.stl_rep && q.sleep && q.en && q.nfault) + B('TRQ_CNT mV', q.trq_mv);
+}
+
+// ---- sampling-rate table (rates from the board's own sample counters, so they are exact)
+const smSet = (id, v) => { const e = $(id); if (e && document.activeElement !== e) e.value = String(v); };
+$('sm_i2c').onchange = e => sendCmd('I2C,' + e.target.value);
+$('sm_tr').onchange = e => sendCmd('TR,' + e.target.value);
+$('sm_ct').onchange = e => sendCmd('CT,' + e.target.value);
+function renderRates(m) {
+  const sy = m.sys;
+  if (sy.i2c_khz) { smSet('sm_i2c', sy.i2c_khz); smSet('sm_tr', sy.telem_ms); smSet('sm_ct', sy.ctl_ms); }
+  const sm = m.smp;
+  if (!sm) { $('rates').innerHTML = '<span class="mute">no sample counters from this firmware</span>'; return; }
+  RXH.push([m.t, sm]); while (RXH.length > 2 && m.t - RXH[0][0] > 5000) RXH.shift();
+  const o = RXH[0], dt = (m.t - o[0]) / 1000;
+  if (RXH.length < 2 || dt < 0.5 || m.t < o[0]) { if (m.t < o[0]) RXH.length = 0; return; }
+  const hz = (n, p) => Math.max(0, (n - p) / dt);
+  const R = (grp, name, val, off) => [grp, name, val, off];
+  const D = i => hz(sm.dev[i], o[1].dev[i]), live = i => m.devs[i] && m.devs[i].live;
+  const idx = ref => m.devs.findIndex(d => d.ref === ref);
+  const rows = [R('Telemetry', 'frames to PC (all groups below)', hz(sm.cyc, o[1].cyc))];
+  rows.push(R('Pressure', 'P0 · U14', D(idx('U14')), !live(idx('U14'))), R('Pressure', 'P1 · U17', D(idx('U17')), !live(idx('U17'))));
+  const INA = [['REG', 'U9'], ['NOZZLE', 'U12'], ['EXTRA 1', 'U15'], ['EXTRA 2', 'U10'], ['EXTRA 3', 'U13'], ['EXTRA 4', 'U16']];
+  INA.forEach(([n, r]) => rows.push(R('Heater power (INA740)', n + ' · ' + r, D(idx(r)), !live(idx(r)))));
+  const names = ['REG', 'NOZZLE', 'EXTRA 1', 'EXTRA 2', 'EXTRA 3', 'EXTRA 4'];
+  names.forEach((n, i) => rows.push(R('Thermistors (ADS7828)', n + (m.htr[i].T_ok ? '' : ' (no sensor)'), hz(sm.therm[i], o[1].therm[i]), !live(idx('U11')))));
+  rows.push(R('Control', 'thermistor read + PID loop', hz(sm.ctl, o[1].ctl)));
+  rows.push(R('Environment', 'SHT45 temp / RH · U4', D(idx('U4')), !live(idx('U4'))));
+  rows.push(R('Flow', 'flow sensor · J6', D(idx('J6')), !live(idx('J6'))));
+  rows.push(R('Other I2C', 'EEPROM ID · U5', D(idx('U5')), !live(idx('U5'))));
+  const fr = hz(sm.cyc, o[1].cyc);
+  rows.push(R('Status (per frame)', 'motor driver pins, solenoid, GPIO, CAN counters', fr));
+  let h = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="color:var(--mute);text-align:left"><th style="padding:4px 8px">Group</th><th style="padding:4px 8px">Stream</th><th style="padding:4px 8px;text-align:right">Hz</th><th style="padding:4px 8px;text-align:right">period ms</th></tr></thead><tbody>';
+  let prev = '';
+  for (const [g, n, v, off] of rows) {
+    h += `<tr style="border-top:1px solid ${g !== prev ? 'var(--sage)' : 'var(--line)'}"><td style="padding:4px 8px;color:var(--grain);font-weight:${g !== prev ? 600 : 400}">${g !== prev ? g : ''}</td><td style="padding:4px 8px">${n}</td>` +
+         `<td class="mono" style="padding:4px 8px;text-align:right;color:${off ? 'var(--bad)' : 'inherit'}">${off ? 'offline' : v.toFixed(1)}</td><td class="mono mute" style="padding:4px 8px;text-align:right">${off || v < 0.05 ? '–' : (1000 / v).toFixed(1)}</td></tr>`;
+    prev = g;
+  }
+  $('rates').innerHTML = h + '</tbody></table>';
+  $('ratehdr').textContent = `measured over the last ${dt.toFixed(1)} s · I2C ${sy.i2c_khz} kHz`;
+}
+
+function render(m) {
+  renderMotor(m); cfgAutoCheck(m);
+  { const on = !!m.sol; $('solst').textContent = on ? 'ON' : 'OFF'; $('solst').className = 'pill ' + (on ? 'pid' : ''); $('sol_on').classList.toggle('act', on); }
+  last = m; lastRx = Date.now(); $('banner').style.display = 'none';
+  hist.push({ts: Date.now() / 1000, m}); if (hist.length > 12000) hist.splice(0, 2000);
+  $('link').classList.add('ok');
+  $('up').textContent = 'up ' + Math.floor(m.t / 60000) + ':' + String(Math.floor(m.t / 1000) % 60).padStart(2, '0');
+  const host = m._host || {armed: $('arm').checked, log: {on: false}};
+  if (host.armed !== $('arm').checked && Date.now() - armTime > 2500) $('arm').checked = host.armed;
+  $('rec').classList.toggle('on', host.log.on); $('rec').textContent = host.log.on ? '■ STOP' : '● REC';
+  $('recinfo').textContent = host.log.on ? `${(host.log.file || '').split('/').pop()} · ${host.log.rows} rows` : (host.log.file ? 'saved: ' + host.log.file : '');
+  $('recinfo').title = host.log.file || '';
+  const pg = m.gpio.find(g => g[0] === 'FUSE_PG');
+  $('fuse').textContent = m.sys.inhibit ? 'Power: CUT' : 'Power: ON' + (pg && !pg[1] ? ' (no PG)' : '');
+  $('fuse').classList.toggle('act', !!m.sys.inhibit);
+
+  m.htr.forEach((h, i) => {
+    const ina = dev(m, ...HT[i].ina), v = dval(ina, 'Bus voltage'), cur = dval(ina, 'Current'), pw = dval(ina, 'Power');
+    const on = h.mode > 0, trip = h.trip === 1 || h.trip === 2;
+    $('c' + i).classList.toggle('on', on); $('c' + i).classList.toggle('trip', trip);
+    const st = $('st' + i);
+    st.textContent = h.trip ? 'TRIP · ' + TRIPS[h.trip] : ['OFF', 'MANUAL', 'PID'][h.mode];
+    st.className = 'pill ' + (h.trip ? 'trip' : ['', 'man', 'pid'][h.mode]);
+    $('T' + i).textContent = f(h.T_c, 1); $('T' + i).title = 'thermistor ' + f(h.R_ohm, 0, ' Ω') + ' · ADC ' + h.adc_raw;
+    $('Sw' + i).classList.toggle('hide', h.mode !== 2); $('S' + i).textContent = f(h.sp_c, 1);
+    $('D' + i).textContent = f(h.duty_pct, 1); $('V' + i).textContent = f(v, 2);
+    $('I' + i).textContent = f(cur, 0); $('W' + i).textContent = f(pw, 2);
+    $('pidt' + i).textContent = h.mode === 2 ? `P ${f(h.pid_p, 1)}  I ${f(h.pid_i, 1)}  D ${f(h.pid_d, 1)}` : '';
+    $('note' + i).textContent = !h.T_ok ? 'no thermistor' : (!ina || !ina.live ? 'INA offline' : (on && v !== null && v < 1 ? 'no output voltage' : ''));
+    $('clr' + i).classList.toggle('hide', !trip);
+    [...$('md' + i).children].forEach(b => b.classList.toggle('sel', +b.dataset.m === h.mode));
+    setView(i);
+    const upd = (id, val) => { const el = $(id + i); if (document.activeElement !== el) el.value = +(+val).toFixed(4); };
+    upd('in_sp', h.sp_c); upd('in_kp', h.kp); upd('in_ki', h.ki); upd('in_kd', h.kd); upd('in_hzp', h.freq_hz); upd('in_hzm', h.freq_hz);
+    upd('in_md', h.maxduty_pct); upd('in_mt', h.maxT_c); upd('in_duty', h.man_pct);
+    $('sl' + i).max = h.maxduty_pct; if (!sliding) $('sl' + i).value = h.man_pct;
+  });
+
+  renderRates(m);
+  { const a = dval(dev(m,0,0x28), 'Pressure (psi)'), b = dval(dev(m,1,0x28), 'Pressure (psi)');
+    $('pbig').innerHTML = `<span style="color:var(--c2)">P0</span> ${f(a, 2)} &nbsp; <span style="color:var(--c3)">P1</span> ${f(b, 2)}`; }
+  const sht = dev(m, 0, 0x44), flow = dev(m, 1, 8), ads = dev(m, 0, 0x48), fu = dev(m, 0, 0x48);
+  const T = (lab, val) => `<div class="tile"><b>${val}</b><span>${lab}</span></div>`;
+  $('tiles').innerHTML =
+    T('Air °C', f(dval(sht, 'Temperature'), 1)) + T('RH %', f(dval(sht, 'Humidity'), 1)) +
+    T('Flow ml/min', f(dval(flow, 'Flow'), 2)) + T('Flow °C', f(dval(flow, 'Temperature'), 1)) +
+    T('P0 / P1 °C', f(dval(dev(m,0,0x28), 'Temperature'), 1) + ' / ' + f(dval(dev(m,1,0x28), 'Temperature'), 1)) +
+    T('Rail V', f(dval(dev(m,0,0x40), 'Bus voltage'), 2)) +
+    T('Fuse I V', f(dval(ads, 'CH6'), 3)) + T('Fuse T V', f(dval(ads, 'CH7'), 3));
+
+  renderStatus(m);
+  if (m.can) {
+    const c = m.can;
+    $('canst').textContent = c.on ? `${c.kbps} kbps · ${c.state} · rx ${c.rx} tx ${c.tx} · err tx ${c.tec} rx ${c.rec} bus ${c.bus_err}` : 'off';
+    $('canlog').textContent = c.log.slice().reverse().map(([t, d, id, x]) => `${(t / 1000).toFixed(2).padStart(8)}  ${d ? 'TX' : 'RX'}  ${id.toString(16).toUpperCase().padStart(3, '0')}  ${x.replace(/(..)/g, '$1 ')}`).join('\n');
+  }
+  $('sys').textContent = `loop ${m.sys.ctl_max_ms} ms · cycle ${m.sys.cycle_ms} ms · β${m.sys.beta}`;
+  refreshEnable(); redraw();
+}
+
+setInterval(() => {
+  if ((serverMode || demo) && lastRx && Date.now() - lastRx > 4000) {
+    $('link').classList.remove('ok'); $('banner').style.display = 'block';
+    $('banner').textContent = 'No data from board.';
+  }
+}, 1000);
+
+if (serverMode) {
+  cfgLoadFile();
+  const es = new EventSource('/events');
+  let lastRender = 0;
+  es.onmessage = e => { if (!demo) { const n = performance.now(); if (n - lastRender < 95) return; lastRender = n; try { render(JSON.parse(e.data)); } catch (x) {} } };
+  es.onerror = () => { $('banner').style.display = 'block'; $('banner').textContent = 'Server connection lost.'; };
+} else {
+  $('banner').style.display = 'block';
+  $('banner').textContent = 'Open http://localhost:8000 for live data.';
+}
+
+// ------------------------------------------------------------------ demo (simulated board, same command set)
+$('demo').onclick = e => { e.preventDefault(); if (demo) { clearInterval(demo.timer); demo = null; $('demo').textContent = 'demo'; return; } startDemo(); $('demo').textContent = 'stop'; };
+function startDemo() {
+  const S = {t: 0, inhibit: 0, sol: 0, armed: false, log: false, rows: 0,
+    H: HT.map((h, i) => ({k: h.k, mode: 0, trip: 0, sp: 40, man: 0, kp: 3, ki: 0.3, kd: 0, md: 30, mt: 100, hz: 200, duty: 0, T: 24 + i * .3, iT: 0, dF: 0, lT: 24, p: 0, i: 0, d: 0}))};
+  demo = {S}; hist = []; lastRx = Date.now();
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  demo.cmd = c => {
+    const p = c.split(','), n = p.slice(1).map(Number), h = S.H[n[0]];
+    if (p[0] === 'ARM') { S.armed = n[0] === 1; }
+    else if (p[0] === 'LOG') { S.log = p[1] === 'start'; if (S.log) S.rows = 0; }
+    else if (p[0] === 'OFF') S.H.forEach(x => { x.mode = 0; });
+    else if (p[0] === 'FUSE') S.inhibit = n[0];
+    else if (p[0] === 'SOL') S.sol = n[0];
+    else if (h && p[0] === 'M') { if (n[1] && h.trip && h.trip < 3) return; h.trip = h.trip === 3 ? 0 : h.trip; if (n[1] === 2) { h.iT = 0; h.dF = 0; h.lT = h.T; } h.mode = n[1]; }
+    else if (h && p[0] === 'S') h.sp = n[1]; else if (h && p[0] === 'D') h.man = clamp(n[1], 0, 100);
+    else if (h && p[0] === 'G') { h.kp = n[1]; h.ki = n[2]; h.kd = n[3]; } else if (h && p[0] === 'F') h.hz = n[1];
+    else if (h && p[0] === 'X') { h.md = n[1]; h.mt = n[2]; } else if (h && p[0] === 'C') h.trip = 0;
+  };
+  const step = dt => S.H.forEach(h => {      // plant: first order, tau 60 s, 2.5 °C per % duty
+    if (h.mode === 2) { const err = h.sp - h.T; h.p = h.kp * err; h.iT = clamp(h.iT + h.ki * err * dt, 0, h.md);
+      h.dF += 0.3 * ((h.T - h.lT) / dt - h.dF); h.d = -h.kd * h.dF; h.i = h.iT; h.lT = h.T; h.duty = clamp(h.p + h.i + h.d, 0, h.md); }
+    else if (h.mode === 1) h.duty = Math.min(h.man, h.md); else { h.duty = 0; h.p = h.i = h.d = 0; }
+    h.T += dt * ((24 - h.T) / 60 + 2.5 / 60 * h.duty) + (Math.random() - .5) * .02;
+    if (h.mode && h.T > h.mt) { h.mode = 0; h.trip = 1; }
+  });
+  const mk = () => {
+    for (let k = 0; k < 2; k++) step(0.125);
+    S.t += 250; const r = Math.random, sec = S.t / 1000;
+    const dv = (bus, addr, ref, name, vals, live = true) => ({bus, addr, ref, name, live, ok: live, note: '', vals: live ? vals : []});
+    const ina = (bus, addr, ref, name, i) => { const d = S.H[i].duty / 100, A = d * 2000; return dv(bus, addr, ref, name, [['Bus voltage (V)', 24 - d * .2], ['Current (mA)', A], ['Power (W)', 24 * A / 1000], ['Die temp (C)', 26 + d * 5]]); };
+    const m = {t: S.t, stuck: [false, false], unexpected: [], gpio: [['DRV nFAULT', 1], ['FUSE_FLT', 1], ['FUSE_PG', 1], ['ALERT REG', 1], ['ALERT NOZZLE', 1]],
+      devs: [dv(0,0x28,'U14','P0',[['Pressure (psi)', 14.7 + 2 * Math.sin(sec / 5)], ['Temperature (C)', 25]]),
+        ina(0,0x40,'U9','INA REG',0), ina(0,0x41,'U12','INA NOZZLE',1),
+        dv(0,0x44,'U4','SHT45',[['Temperature (C)', 24 + r() * .1], ['Humidity (%RH)', 42 + r()]]), ina(0,0x45,'U16','INA X4',5),
+        dv(0,0x48,'U11','ADS',[['CH6 FUSE_IMON', .01], ['CH7 FUSE_TEMP', .6]]), dv(0,0x50,'U5','EEPROM',[]),
+        dv(1,8,'J6','Flow',[['Flow (ml/min)', 1.2 + .2 * Math.sin(sec / 3)], ['Temperature (C)', 23]], (S.t / 8000 | 0) % 2 === 0),
+        dv(1,0x28,'U17','P1',[['Pressure (psi)', 12 + 1.5 * Math.cos(sec / 4)], ['Temperature (C)', 25]]),
+        ina(1,0x40,'U15','INA X1',2), ina(1,0x41,'U10','INA X2',3), ina(1,0x44,'U13','INA X3',4)],
+      htr: S.H.map(h => ({k: h.k, mode: h.mode, trip: h.trip, duty_pct: h.duty, freq_hz: h.hz, sp_c: h.sp, man_pct: h.man, kp: h.kp, ki: h.ki, kd: h.kd,
+        maxduty_pct: h.md, maxT_c: h.mt, adc_raw: 2000, T_ok: 1, T_c: h.T, R_ohm: 10000, pid_p: h.p, pid_i: h.i, pid_d: h.d})),
+      sol: S.sol,
+      sys: {inhibit: S.inhibit, heap: 330000, ctl_max_ms: 100, cycle_ms: 57, beta: 3950, r0: 10000, deadman_ms: 3000}};
+    if (S.log) S.rows++;
+    m._host = {armed: S.armed, log: {on: S.log, file: S.log ? '/demo/nebulizer_demo.csv' : null, rows: S.rows}};
+    render(m);
+  };
+  demo.timer = setInterval(mk, 250); mk();
+}
+function demoCmd(c) { demo.cmd(c); }
+</script>
+</body>
+</html>

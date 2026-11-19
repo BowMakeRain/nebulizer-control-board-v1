@@ -37,6 +37,7 @@ DEVS = [(0,0x28,"U14","Pressure sensor 0"),(0,0x40,"U9","INA740 REG heater"),(0,
         (0,0x45,"U16","INA740 EXTRA heater 4"),(0,0x48,"U11","ADS7828 ADC mux"),(0,0x50,"U5","24AA02UID EEPROM"),(1,0x08,"J6","Flow sensor"),
         (1,0x28,"U17","Pressure sensor 1"),(1,0x40,"U15","INA740 EXTRA heater 1"),(1,0x41,"U10","INA740 EXTRA heater 2"),(1,0x44,"U13","INA740 EXTRA heater 3")]
 INA_IDX = [1, 2, 9, 10, 11, 4]
+CAN_KBPS = int(re.search(r"CAN_KBPS = (\d+)", open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "NebCanProto.h")).read()).group(1))   # same constant the firmware uses
 HKEYS = ["reg", "nozzle", "extra1", "extra2", "extra3", "extra4"]
 
 
@@ -83,7 +84,7 @@ def can_to_board(c):
     gpio = [["DRV nFAULT", (sf >> 4) & 1], ["STL_REP", (sf >> 5) & 1], ["FUSE_FLT", (sf >> 1) & 1], ["FUSE_PG", sf & 1], ["FUSE_EN", 0 if (sf >> 2) & 1 else 1]]
     smp_dev = [n["press"], n["pow"][0], n["pow"][1], n["env"], n["pow"][5], n["adc"], 0, n["env"], n["press"], n["pow"][2], n["pow"][3], n["pow"][4]]
     return {"t": c["up"], "src": "can", "stuck": [False, False], "unexpected": [], "gpio": gpio, "devs": devs, "htr": htr, "sol": 1 if (sf >> 3) & 1 else 0, "mot": mot,
-            "can": {"on": 1, "kbps": 500, "mode": 0, "state": "running" if alive else "no board", "rx": c["rx"], "tx": c["tx"], "tx_fail": c["txf"],
+            "can": {"on": 1, "kbps": CAN_KBPS, "mode": 0, "state": "running" if alive else "no board", "rx": c["rx"], "tx": c["tx"], "tx_fail": c["txf"],
                     "tec": c["dev"][3], "rec": c["dev"][4], "bus_err": 0, "rx_miss": 0, "arb_lost": 0, "log": []},
             "smp": {"cyc": n["dev"], "ctl": n["heat"][0], "dev": smp_dev, "therm": n["heat"]},
             "sys": {"i2c_khz": c["adc"][2], "telem_ms": 0, "ctl_ms": c["adc"][3], "rst": c["rst"], "inhibit": (sf >> 2) & 1, "heap": 0, "ctl_max_ms": 0,

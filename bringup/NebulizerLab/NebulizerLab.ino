@@ -26,7 +26,7 @@
        MR,<1 stall report off (STL_REP held low) | 0 on>  MS,<step Hz> (0 stop)  MA,<accel Hz/s>  MC clear fault. Boot: asleep, disabled, STEP low.
     CANT,<idhex>,<datahex>  send a standard frame (up to 8 bytes, e.g. CANT,123,DEADBEEF)
   CAN: TJA1051 U3, CAN_TX = GPIO40 (U2.33), CAN_RX = GPIO39 (U2.32), S pin tied to GND (always normal mode),
-       R63 (120 ohm CANH-CANL) is DNI: board has NO termination. Boot default: 500 kbps, normal mode.
+       R63 (120 ohm CANH-CANL) is DNI: board has NO termination. Boot default: nc::CAN_KBPS (NebCanProto.h, 50 kbps), normal mode.
 
   Arduino IDE / arduino-cli: ESP32S3 Dev Module, USB CDC On Boot = Enabled (required).
 */
@@ -37,6 +37,7 @@
 #include "esp_system.h"
 #include "NebCanProto.h"
 #include "esp_ota_ops.h"
+#include "soc/rtc_cntl_reg.h"
 #include "esp_partition.h"
 #ifndef FW_TAG
 #define FW_TAG "dev"
@@ -48,6 +49,15 @@
 // FUSE_EN is driven HIGH at boot (e-fuse on). FUSE,1 cuts power (LOW), FUSE,0 turns it back on (HIGH).
 
 struct Reading;   // forward declaration for Arduino auto-prototypes
+
+// ---- boot diagnostics: the last 4 reset reasons survive resets in RTC memory and go out on CAN (ID_BOOT) and in the USB JSON.
+// esp_reset_reason: 1 power-on, 2 ext pin, 3 software, 4 panic, 5 int wdt, 6 task wdt, 7 other wdt, 9 BROWN-OUT, 11 USB, 12 JTAG, 14 power glitch
+RTC_NOINIT_ATTR static uint32_t rtcMagic;
+RTC_NOINIT_ATTR static uint8_t rtcReasons[4];
+RTC_NOINIT_ATTR static uint16_t rtcBoots;
+RTC_NOINIT_ATTR static volatile uint32_t rtcStage;     // breadcrumb: how far boot got (readable with esptool read-mem even if the app hangs)
+RTC_NOINIT_ATTR static volatile uint32_t rtcCycles;    // completed cycle() runs since the last power-on
+static bool rtcHistoryValid = false;
 
 // ---------------------------------------------------------------- configuration
 static uint32_t i2cHz = 400000;            // I2C clock, set with I2C,<kHz>
@@ -104,6 +114,22 @@ static void setMode(int i, int m) {
   if (m == 2 && h.mode != 2) { h.iTerm = 0; h.dFilt = 0; h.lastT = h.T; }
   h.mode = m;
   if (m == 0) { h.duty = 0; h.p = h.i = h.d = 0; applyPwm(h); }
+}
+// The hardware brown-out detector stays ON. (Writing RTC_CNTL_BROWN_OUT_REG at boot, as an experiment, stopped the firmware from starting at all.)
+// Build with -DDISABLE_BROWNOUT only to experiment.
+// Runs as early as C++ constructors allow (before setup()): stop the brown-out detector from resetting the chip while the 3.3 V rail is still ramping.
+__attribute__((constructor(101))) static void earlyBrownoutOff() {
+#ifdef DISABLE_BROWNOUT
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+#endif
+}
+static void bootInit() {
+#ifdef DISABLE_BROWNOUT
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+#endif
+  rtcHistoryValid = (rtcMagic == 0xB007CAFE);
+  if (!rtcHistoryValid) { rtcMagic = 0xB007CAFE; memset(rtcReasons, 0, sizeof(rtcReasons)); rtcBoots = 0; }
+  memmove(rtcReasons + 1, rtcReasons, 3); rtcReasons[0] = (uint8_t)esp_reset_reason(); rtcBoots++;
 }
 // ---------------------------------------------------------------- stepper driver U6 (DRV8434A)
 // MCU nets: nSLEEP=GPIO5 ENABLE=GPIO6 DIR=GPIO7 STEP=GPIO15 STL_MODE=GPIO16 TRQ_CNT=GPIO17(analog in)
@@ -206,7 +232,7 @@ static struct {
   float p[2], pt[2], flow, flowT, shtT, rh, vbus[6], ma[6], pw[6], die[6], imon, ftemp;
   uint16_t live, ok;
 } cache;
-static uint32_t canPeriod = 100;                      // CAN telemetry period ms (0 = off), CANP,<ms>
+static uint32_t canPeriod = 100;                     // CAN telemetry period ms (0 = off), CANP,<ms>
 static uint32_t lastUsb = 0;                          // last time a command arrived over USB (USB has priority over CAN)
 static bool usbActive() { return lastUsb && millis() - lastUsb < nc::USB_HOLD_MS; }
 static void canOnFrame(const twai_message_t &m);      // CAN command handler (defined after cycle())
@@ -216,7 +242,7 @@ static void canTelemTick();
 static const int PIN_CAN_TX = 40, PIN_CAN_RX = 39;
 struct CanFrame { uint32_t ms; uint32_t id; uint8_t len; uint8_t d[8]; uint8_t dir; };   // dir 0 rx, 1 tx
 static CanFrame canLog[8]; static int canHead = 0;
-static bool canOn = false; static int canKbps = 500, canMode = 0;
+static bool canOn = false; static int canKbps = nc::CAN_KBPS, canMode = 0;
 static uint32_t canRx = 0, canTx = 0, canTxFail = 0;
 
 static void canLogAdd(const twai_message_t &m, uint8_t dir) {
@@ -657,9 +683,9 @@ static void cycle() {
   ap("],\"therm\":[");
   for (int i = 0; i < 6; i++) ap("%s%lu", i ? "," : "", (unsigned long)thermOk[i]);
   ap("]}");
-  ap(",\"sys\":{\"i2c_khz\":%lu,\"telem_ms\":%lu,\"ctl_ms\":%lu,\"rst\":%d,\"inhibit\":%d,\"heap\":%u,\"ctl_max_ms\":%lu,\"cycle_ms\":%lu,\"beta\":%.0f,\"r0\":%.0f,\"deadman_ms\":%lu,\"ctl_src\":\"%s\",\"can_ms\":%lu,\"fw\":\"%s\",\"slot\":%d,\"ota_pend\":%d,\"ota_state\":%d,\"build\":%lu}}\n",
+  ap(",\"sys\":{\"i2c_khz\":%lu,\"telem_ms\":%lu,\"ctl_ms\":%lu,\"rst\":%d,\"inhibit\":%d,\"heap\":%u,\"ctl_max_ms\":%lu,\"cycle_ms\":%lu,\"beta\":%.0f,\"r0\":%.0f,\"deadman_ms\":%lu,\"ctl_src\":\"%s\",\"can_ms\":%lu,\"fw\":\"%s\",\"slot\":%d,\"ota_pend\":%d,\"ota_state\":%d,\"build\":%lu,\"boot\":[%u,%u,%u,%u],\"boots\":%u,\"stage\":%lu,\"cyc\":%lu}}\n",
      (unsigned long)(i2cHz / 1000), (unsigned long)telemMs, (unsigned long)ctlMs, (int)esp_reset_reason(), fuseInhibit ? 1 : 0, (unsigned)ESP.getFreeHeap(), (unsigned long)ctlMaxMs, (unsigned long)lastCycleMs,
-     thermBeta, thermR0, (unsigned long)DEADMAN_MS, usbActive() ? "usb" : (millis() - lastPing < DEADMAN_MS ? "can" : "none"), (unsigned long)canPeriod, FW_TAG, runningSlot(), otaPending ? 1 : 0, otaStateRaw, (unsigned long)buildId);
+     thermBeta, thermR0, (unsigned long)DEADMAN_MS, usbActive() ? "usb" : (millis() - lastPing < DEADMAN_MS ? "can" : "none"), (unsigned long)canPeriod, FW_TAG, runningSlot(), otaPending ? 1 : 0, otaStateRaw, (unsigned long)buildId, rtcReasons[0], rtcReasons[1], rtcReasons[2], rtcReasons[3], rtcBoots, (unsigned long)rtcStage, (unsigned long)rtcCycles);
   Serial.write('\n');                                // resync marker if the previous line was cut short
   Serial.write((const uint8_t *)ob, ol);
   ctlMaxMs = 0;
@@ -851,34 +877,50 @@ static void canTelemTick() {                          // spreads one telemetry p
   uint32_t now = millis();
   static uint32_t lastHb = 0, lastF = 0; static int k = 0;
   if (now - lastHb >= 1000) {
-    lastHb = now; uint8_t d[8] = {'N', nc::PROTO_VER, (uint8_t)runningSlot(), (uint8_t)((otaPending ? 1 : 0) | (otaOn ? 2 : 0)), 0, 0, 0, 0}; nc::put32(d + 4, now); canSendEx(nc::ID_HB, d, 8, false);
+    lastHb = now; { uint8_t b[8] = {rtcReasons[0], rtcReasons[1], rtcReasons[2], rtcReasons[3], 0, 0,
+#ifdef DISABLE_BROWNOUT
+      1
+#else
+      0
+#endif
+      | (rtcHistoryValid ? 2 : 0), 0}; nc::put16(b + 4, rtcBoots); canSendEx(nc::ID_BOOT, b, 8, false); }
+    uint8_t d[8] = {'N', nc::PROTO_VER, (uint8_t)runningSlot(), (uint8_t)((otaPending ? 1 : 0) | (otaOn ? 2 : 0)), 0, 0, 0, 0}; nc::put32(d + 4, now); canSendEx(nc::ID_HB, d, 8, false);
   }
   if (!canPeriod) return;
   uint32_t gapUs = canPeriod * 1000UL / nc::N_TELEM_FRAMES;      // exact spacing, catch-up after long I2C stretches
   uint32_t us = micros();
   if (us - lastF > 20UL * gapUs) lastF = us - gapUs;               // resync after a long stall (never burst more than a few frames)
-  for (int sent = 0; sent < 8 && (uint32_t)(us - lastF) >= gapUs; sent++) { lastF += gapUs; canTelemFrame(k); k = (k + 1) % nc::N_TELEM_FRAMES; }
+  for (int sent = 0; sent < 2 && (uint32_t)(us - lastF) >= gapUs; sent++) { lastF += gapUs; canTelemFrame(k); k = (k + 1) % nc::N_TELEM_FRAMES; }
 }
 
 // ---------------------------------------------------------------- setup / loop
 void setup() {
+  bootInit();                                         // first thing: brown-out off, record why we reset
+  rtcStage = 1; rtcCycles = 0;
   for (auto &h : H) { pinMode(h.pin, OUTPUT); digitalWrite(h.pin, LOW); }   // safe state first
+  rtcStage = 2;
   Serial.begin(115200);
+  rtcStage = 3;
   Serial.setTxTimeoutMs(5);                          // no USB host reading: never stall the loop (CAN-only operation)
   for (auto &h : H) { ledcAttach(h.pin, h.freq, PWM_BITS); ledcWrite(h.pin, 0); }
   for (const Gp &g : GPIOS) pinMode(g.pin, INPUT);
   pinMode(PIN_FUSE_EN, OUTPUT); digitalWrite(PIN_FUSE_EN, HIGH);   // e-fuse ON at boot (heater gates are LOW)
-  busInit(0); busInit(1);
-  pinMode(PIN_SOL, OUTPUT); digitalWrite(PIN_SOL, LOW);
+  rtcStage = 4; busInit(0); busInit(1);
+  rtcStage = 5; pinMode(PIN_SOL, OUTPUT); digitalWrite(PIN_SOL, LOW);
   motorInit();
+  rtcStage = 6;
   { float *f = (float *)&cache; for (size_t i = 0; i < (sizeof(cache) - 4) / 4; i++) f[i] = NAN; }
   otaInit();
-  canStart(500, 0);
+  canPeriod = nc::DEFAULT_PERIOD_MS;
+  rtcStage = 7;
+  canStart(nc::CAN_KBPS, 0);
+  rtcStage = 8;
   delay(300);
+  rtcStage = 9;
 }
 
 void loop() {
   uint32_t t0 = millis();
-  cycle();
+  cycle(); rtcCycles++; rtcStage = 10;
   do { handleSerial(); controlTick(); canPoll(); canTelemTick(); if (telemMs) delay(1); } while (millis() - t0 < telemMs);
 }

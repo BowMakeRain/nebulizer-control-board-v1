@@ -7,6 +7,10 @@
 
 namespace nc {
 static const uint8_t PROTO_VER = 1;
+// Bus speed shared by the board and the Feather (compile-time; both must match). Slow on purpose while the wiring is poor.
+// 50 kbit/s is the slowest rate both the ESP32 TWAI and the MCP2515 (16 MHz) can do from their standard tables.
+static const int CAN_KBPS = 50;
+static const int DEFAULT_PERIOD_MS = CAN_KBPS >= 250 ? 100 : 250;   // telemetry period: 19 frames per period must fit the bus (~25 % load)
 static const int NHEAT = 6;
 
 // ---- IDs (lower = higher priority)
@@ -23,6 +27,7 @@ static const uint16_t ID_MOTOR  = 0x340;   // stepper driver state
 static const uint16_t ID_MOTOR2 = 0x341;   // stepper target / accel
 static const uint16_t ID_ADC    = 0x350;   // e-fuse analog + rates
 static const uint16_t ID_DEV    = 0x360;   // I2C device health + CAN error counters
+static const uint16_t ID_BOOT   = 0x701;   // 1 Hz with the heartbeat: last 4 reset reasons (newest first), boot count, flags (b0 brown-out reset disabled, b1 history valid)
 static const uint16_t ID_HB     = 0x700;   // 1 Hz heartbeat (always, even if telemetry is off)
 static const int OTA_PAYLOAD = 5, OTA_WINDOW = 16, OTA_BLOCK = 4000;   // bytes per frame, frames per ack, bytes per PC->Feather block
 enum : uint8_t { OTA_OK = 0, OTA_ERR_WRITE = 1, OTA_ERR_VERIFY = 2, OTA_ERR_STATE = 3 };

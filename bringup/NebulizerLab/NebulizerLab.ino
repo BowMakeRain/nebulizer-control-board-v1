@@ -35,6 +35,12 @@
 #include <stdarg.h>
 #include "driver/twai.h"
 #include "esp_system.h"
+#include "NebCanProto.h"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
+#ifndef FW_TAG
+#define FW_TAG "dev"
+#endif
 
 #if !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools > USB CDC On Boot > Enabled (otherwise Serial = UART0 = GPIO43/44 = FUSE_EN/FUSE_PG)."
@@ -195,6 +201,17 @@ static bool adsRead(int ch, int &raw) {            // PD=01: internal ref off (R
 }
 
 
+// latest sensor values for the CAN telemetry (filled in cycle(); NAN = no value)
+static struct {
+  float p[2], pt[2], flow, flowT, shtT, rh, vbus[6], ma[6], pw[6], die[6], imon, ftemp;
+  uint16_t live, ok;
+} cache;
+static uint32_t canPeriod = 100;                      // CAN telemetry period ms (0 = off), CANP,<ms>
+static uint32_t lastUsb = 0;                          // last time a command arrived over USB (USB has priority over CAN)
+static bool usbActive() { return lastUsb && millis() - lastUsb < nc::USB_HOLD_MS; }
+static void canOnFrame(const twai_message_t &m);      // CAN command handler (defined after cycle())
+static void canTelemTick();
+
 // ---------------------------------------------------------------- CAN (TWAI -> TJA1051)
 static const int PIN_CAN_TX = 40, PIN_CAN_RX = 39;
 struct CanFrame { uint32_t ms; uint32_t id; uint8_t len; uint8_t d[8]; uint8_t dir; };   // dir 0 rx, 1 tx
@@ -227,27 +244,37 @@ static bool canStart(int kbps, int mode) {
   }
   twai_mode_t tm = mode == 1 ? TWAI_MODE_LISTEN_ONLY : (mode == 2 ? TWAI_MODE_NO_ACK : TWAI_MODE_NORMAL);
   twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)PIN_CAN_TX, (gpio_num_t)PIN_CAN_RX, tm);
-  g.tx_queue_len = 8; g.rx_queue_len = 16;
+  g.tx_queue_len = 40; g.rx_queue_len = 128;
   twai_filter_config_t f = TWAI_FILTER_CONFIG_ACCEPT_ALL();
   if (twai_driver_install(&g, &t, &f) != ESP_OK) return false;
   if (twai_start() != ESP_OK) { twai_driver_uninstall(); return false; }
   canOn = true; canKbps = kbps; canMode = mode;
   return true;
 }
-static void canSend(uint32_t id, const uint8_t *d, int n) {
+static void canSendEx(uint32_t id, const uint8_t *d, int n, bool lg) {
   if (!canOn || canMode == 1) { canTxFail++; return; }
   twai_message_t m = {}; m.identifier = id & 0x7FF; m.data_length_code = n;
   if (canMode == 2) m.self = 1;                      // self-test: receive our own frame (no ACK needed)
   memcpy(m.data, d, n);
   esp_err_t er = twai_transmit(&m, 0);
-  if (er == ESP_OK) { canTx++; canLogAdd(m, 1); } else canTxFail++;
+  if (er == ESP_OK) { canTx++; if (lg) canLogAdd(m, 1); } else canTxFail++;
 }
+static void canSend(uint32_t id, const uint8_t *d, int n) { canSendEx(id, d, n, true); }
 static void canPoll() {                              // call often: drain RX queue
   if (!canOn) return;
   twai_message_t m;
   while (twai_receive(&m, 0) == ESP_OK) {
     if (m.rtr) continue;
-    canRx++; canLogAdd(m, 0);
+    canRx++; if (m.identifier != nc::ID_OTA_DATA && (m.identifier == nc::ID_CMD || canRx < 50 || (canRx & 0x3F) == 0)) canLogAdd(m, 0);
+    canOnFrame(m);
+  }
+  static uint32_t lastChk = 0;
+  if (millis() - lastChk > 250) {                    // bus-off / stopped recovery
+    lastChk = millis(); twai_status_info_t st;
+    if (twai_get_status_info(&st) == ESP_OK) {
+      if (st.state == TWAI_STATE_BUS_OFF) twai_initiate_recovery();
+      else if (st.state == TWAI_STATE_STOPPED) twai_start();
+    }
   }
 }
 static void canHandleCmd(const char *s) {            // "CANT,123,DEADBEEF"
@@ -264,13 +291,35 @@ static void canHandleCmd(const char *s) {            // "CANT,123,DEADBEEF"
 // ---------------------------------------------------------------- serial commands
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+static void fuseSet(int v) {
+  fuseInhibit = (v == 1);                            // 1 = cut power (FUSE_EN low), 0 = power on (FUSE_EN driven high)
+  pinMode(PIN_FUSE_EN, OUTPUT); digitalWrite(PIN_FUSE_EN, fuseInhibit ? LOW : HIGH);
+}
+static void heaterFreq(int i, float hz) {
+  ledcChangeFrequency(H[i].pin, (uint32_t)clampf(hz, 1, 20000), PWM_BITS);
+  // LEDC timers are shared between channel pairs: read back the real frequency of every heater
+  for (auto &h : H) { h.freq = ledcReadFreq(h.pin); applyPwm(h); }
+}
 static void handleLine(char *s) {
-  lastPing = millis();
+  lastPing = millis(); lastUsb = lastPing;           // USB command: feeds the dead-man and takes priority over CAN
   int i, m, v; float a, b, c, d;
   if (!strcmp(s, "OFF")) { allOff(); return; }
+  if (!strcmp(s, "CANDBG")) {                        // bit-bang TXD and read RXD (CAN stopped): checks the TJA1051 path
+    bool was = canOn; int kb = canKbps, md = canMode; canStop();
+    pinMode(PIN_CAN_TX, OUTPUT); pinMode(PIN_CAN_RX, INPUT_PULLUP); int r[6];
+    digitalWrite(PIN_CAN_TX, HIGH); delay(2); r[0] = digitalRead(PIN_CAN_RX);
+    digitalWrite(PIN_CAN_TX, LOW);  delay(2); r[1] = digitalRead(PIN_CAN_RX);
+    digitalWrite(PIN_CAN_TX, HIGH); delay(2); r[2] = digitalRead(PIN_CAN_RX);
+    pinMode(PIN_CAN_RX, INPUT_PULLDOWN); delay(2); r[3] = digitalRead(PIN_CAN_RX);
+    pinMode(PIN_CAN_TX, INPUT); pinMode(PIN_CAN_RX, INPUT_PULLUP); delay(2); r[4] = digitalRead(PIN_CAN_RX);   // TX released
+    pinMode(PIN_CAN_RX, INPUT_PULLDOWN); delay(2); r[5] = digitalRead(PIN_CAN_RX);
+    Serial.printf("CANDBG tx=1:rx=%d tx=0:rx=%d tx=1:rx=%d | tx=1 rx-pulldown:%d | tx-floating rx-pullup:%d rx-pulldown:%d\n", r[0], r[1], r[2], r[3], r[4], r[5]);
+    if (was) canStart(kb, md); return;
+  }
   if (sscanf(s, "I2C,%d", &v) == 1 && v >= 50 && v <= 1700) { i2cHz = (uint32_t)v * 1000; busInit(0); busInit(1); return; }
   if (sscanf(s, "CT,%d", &v) == 1 && v >= 5 && v <= 1000) { ctlMs = (uint32_t)v; return; }
   if (sscanf(s, "TR,%d", &v) == 1 && v >= 0 && v <= 5000) { telemMs = (uint32_t)v; return; }
+  if (sscanf(s, "CANP,%d", &v) == 1 && (v == 0 || (v >= 10 && v <= 5000))) { canPeriod = (uint32_t)v; return; }
   if (sscanf(s, "SOL,%d", &v) == 1) { solSet(v); return; }
   if (sscanf(s, "MR,%d", &v) == 1) { M.stlDis = v ? 1 : 0; motorApplyPins(); return; }
   if (sscanf(s, "MP,%d", &v) == 1) { M.sleepHi = v ? 1 : 0; if (!M.sleepHi) motorStop(); motorApplyPins(); return; }
@@ -291,9 +340,7 @@ static void handleLine(char *s) {
     H[i].kp = clampf(a, 0, 1000); H[i].ki = clampf(b, 0, 1000); H[i].kd = clampf(c, 0, 1000); return;
   }
   if (sscanf(s, "F,%d,%f", &i, &a) == 2 && i >= 0 && i < NHEAT) {
-    ledcChangeFrequency(H[i].pin, (uint32_t)clampf(a, 1, 20000), PWM_BITS);
-    // LEDC timers are shared between channel pairs: read back the real frequency of every heater
-    for (auto &h : H) { h.freq = ledcReadFreq(h.pin); applyPwm(h); }
+    heaterFreq(i, a);
     return;
   }
   if (sscanf(s, "X,%d,%f,%f", &i, &a, &b) == 3 && i >= 0 && i < NHEAT) {
@@ -302,8 +349,7 @@ static void handleLine(char *s) {
   if (sscanf(s, "C,%d", &i) == 1 && i >= 0 && i < NHEAT) { H[i].trip = 0; return; }
   if (sscanf(s, "TH,%f,%f", &a, &b) == 2) { thermBeta = clampf(a, 1000, 10000); thermR0 = clampf(b, 100, 1000000); return; }
   if (sscanf(s, "FUSE,%d", &v) == 1) {
-    fuseInhibit = (v == 1);                        // 1 = cut power (FUSE_EN low), 0 = power on (FUSE_EN driven high)
-    pinMode(PIN_FUSE_EN, OUTPUT); digitalWrite(PIN_FUSE_EN, fuseInhibit ? LOW : HIGH);
+    fuseSet(v);
     return;
   }
   (void)d;
@@ -375,7 +421,7 @@ static void controlTick() {
 static uint32_t g_pre = 0;                           // >0: conversion was already triggered at this millis() (pipelined read)
 static void waitMs(uint32_t ms) {                    // delay that keeps the control loop and commands alive
   uint32_t t0 = millis();
-  while (millis() - t0 < ms) { handleSerial(); controlTick(); canPoll(); delay(1); }
+  while (millis() - t0 < ms) { handleSerial(); controlTick(); canPoll(); canTelemTick(); delay(1); }
 }
 
 // ---------------------------------------------------------------- readings
@@ -497,6 +543,8 @@ static void fnum(float v, const char *fmt = "%.4f") { if (isfinite(v)) ap(fmt, v
 static bool scanFound[2][128];
 static uint32_t lastScan = 0, lastCycleMs = 0;
 
+static void cacheUpdate(const Reading *rd, const bool *okd, const bool *live);
+static bool otaPending = false; static uint32_t buildId = 0; static int otaStateRaw = -1; static int runningSlot();
 static void cycle() {
   uint32_t t0 = millis();
   static bool devOk[NDEV] = {}; static uint32_t smp[NDEV] = {};
@@ -506,7 +554,7 @@ static void cycle() {
     if (devOk[i]) live[i] = true;                      // last read worked: skip the extra address probe (saves a transaction)
     else { w.beginTransmission(DEVS[i].addr); live[i] = (w.endTransmission() == 0); }
     if (live[i]) liveCount[DEVS[i].bus]++;
-    controlTick();
+    controlTick(); canPoll(); canTelemTick();
   }
   if (!live[FLOW_IDX]) flowRunning = false;
   {                                                    // incremental address scan: 16 addresses per cycle per bus (keeps cycles short)
@@ -546,9 +594,10 @@ static void cycle() {
       g_pre = 0;
       devOk[i] = okd[i]; if (okd[i]) smp[i]++;
       if (!okd[i] && live[i]) { TwoWire &w = busRef(DEVS[i].bus); w.beginTransmission(DEVS[i].addr); live[i] = (w.endTransmission() == 0); }
-      controlTick();
+      controlTick(); canPoll(); canTelemTick();
     }
 
+  cacheUpdate(rd, okd, live);
   ol = 0;
   ap("{\"t\":%lu,\"stuck\":[%s,%s],\"devs\":[", (unsigned long)millis(), stuck[0] ? "true" : "false", stuck[1] ? "true" : "false");
   for (int i = 0; i < NDEV; i++) {
@@ -584,10 +633,11 @@ static void cycle() {
   { twai_status_info_t st = {}; if (canOn) twai_get_status_info(&st);
     const char *sn[] = {"stopped", "running", "bus-off", "recovering"};
     ap(",\"can\":{\"on\":%d,\"kbps\":%d,\"mode\":%d,\"state\":\"%s\",\"rx\":%lu,\"tx\":%lu,\"tx_fail\":%lu,"
-       "\"tec\":%lu,\"rec\":%lu,\"bus_err\":%lu,\"rx_miss\":%lu,\"arb_lost\":%lu,\"log\":[",
+       "\"tec\":%lu,\"rec\":%lu,\"bus_err\":%lu,\"rx_miss\":%lu,\"arb_lost\":%lu,\"q_tx\":%lu,\"q_rx\":%lu,\"tx_failed\":%lu,\"log\":[",
        canOn ? 1 : 0, canKbps, canMode, canOn ? sn[st.state] : "off", (unsigned long)canRx, (unsigned long)canTx,
        (unsigned long)canTxFail, (unsigned long)st.tx_error_counter, (unsigned long)st.rx_error_counter,
-       (unsigned long)st.bus_error_count, (unsigned long)st.rx_missed_count, (unsigned long)st.arb_lost_count);
+       (unsigned long)st.bus_error_count, (unsigned long)st.rx_missed_count, (unsigned long)st.arb_lost_count,
+       (unsigned long)st.msgs_to_tx, (unsigned long)st.msgs_to_rx, (unsigned long)st.tx_failed_count);
     bool firstF = true;
     for (int k = 0; k < 8; k++) {
       const CanFrame &f = canLog[(canHead + k) % 8]; if (!f.ms) continue;
@@ -607,24 +657,222 @@ static void cycle() {
   ap("],\"therm\":[");
   for (int i = 0; i < 6; i++) ap("%s%lu", i ? "," : "", (unsigned long)thermOk[i]);
   ap("]}");
-  ap(",\"sys\":{\"i2c_khz\":%lu,\"telem_ms\":%lu,\"ctl_ms\":%lu,\"rst\":%d,\"inhibit\":%d,\"heap\":%u,\"ctl_max_ms\":%lu,\"cycle_ms\":%lu,\"beta\":%.0f,\"r0\":%.0f,\"deadman_ms\":%lu}}\n",
+  ap(",\"sys\":{\"i2c_khz\":%lu,\"telem_ms\":%lu,\"ctl_ms\":%lu,\"rst\":%d,\"inhibit\":%d,\"heap\":%u,\"ctl_max_ms\":%lu,\"cycle_ms\":%lu,\"beta\":%.0f,\"r0\":%.0f,\"deadman_ms\":%lu,\"ctl_src\":\"%s\",\"can_ms\":%lu,\"fw\":\"%s\",\"slot\":%d,\"ota_pend\":%d,\"ota_state\":%d,\"build\":%lu}}\n",
      (unsigned long)(i2cHz / 1000), (unsigned long)telemMs, (unsigned long)ctlMs, (int)esp_reset_reason(), fuseInhibit ? 1 : 0, (unsigned)ESP.getFreeHeap(), (unsigned long)ctlMaxMs, (unsigned long)lastCycleMs,
-     thermBeta, thermR0, (unsigned long)DEADMAN_MS);
+     thermBeta, thermR0, (unsigned long)DEADMAN_MS, usbActive() ? "usb" : (millis() - lastPing < DEADMAN_MS ? "can" : "none"), (unsigned long)canPeriod, FW_TAG, runningSlot(), otaPending ? 1 : 0, otaStateRaw, (unsigned long)buildId);
+  Serial.write('\n');                                // resync marker if the previous line was cut short
   Serial.write((const uint8_t *)ob, ol);
   ctlMaxMs = 0;
   lastCycleMs = millis() - t0;
+}
+
+// ---------------------------------------------------------------- CAN protocol (see NebCanProto.h / CAN_PROTOCOL.md)
+static const int INA_IDX[6] = {1, 2, 9, 10, 11, 4};   // DEVS[] index of the INA740 for heater 0..5 (reg, nozzle, extra1..4)
+static const int PRESS_IDX[2] = {0, 8}, SHT_IDX = 3, ADS_IDX = 5;
+static float vOk(bool ok, const Reading &r, int k) { return ok && k < r.n ? r.v[k] : NAN; }
+static void cacheUpdate(const Reading *rd, const bool *okd, const bool *live) {
+  cache.live = cache.ok = 0;
+  for (int i = 0; i < NDEV; i++) { if (live[i]) cache.live |= 1u << i; if (okd[i]) cache.ok |= 1u << i; }
+  for (int i = 0; i < 6; i++) {
+    int d = INA_IDX[i];
+    cache.vbus[i] = vOk(okd[d], rd[d], 0); cache.ma[i] = vOk(okd[d], rd[d], 1);
+    cache.pw[i] = vOk(okd[d], rd[d], 2);   cache.die[i] = vOk(okd[d], rd[d], 3);
+  }
+  for (int i = 0; i < 2; i++) { int d = PRESS_IDX[i]; cache.p[i] = vOk(okd[d], rd[d], 0); cache.pt[i] = vOk(okd[d], rd[d], 1); }
+  cache.flow = vOk(okd[FLOW_IDX], rd[FLOW_IDX], 0); cache.flowT = vOk(okd[FLOW_IDX], rd[FLOW_IDX], 1);
+  cache.shtT = vOk(okd[SHT_IDX], rd[SHT_IDX], 0);   cache.rh = vOk(okd[SHT_IDX], rd[SHT_IDX], 1);
+  cache.imon = vOk(okd[ADS_IDX], rd[ADS_IDX], 6);   cache.ftemp = vOk(okd[ADS_IDX], rd[ADS_IDX], 7);
+}
+static int16_t s16(float v, float scale) { return isfinite(v) ? (int16_t)constrain(lroundf(v * scale), -32000L, 32000L) : nc::INV16; }
+static uint16_t u16s(float v, float scale) { return (isfinite(v) && v >= 0) ? (uint16_t)constrain(lroundf(v * scale), 0L, 65000L) : nc::INVU16; }
+
+// ---------------------------------------------------------------- firmware update over CAN (OTA into the spare app slot)
+// The Arduino core normally marks every image valid at boot; return true so WE decide (after hearing from the host over CAN).
+extern "C" bool verifyRollbackLater() { return true; }
+static esp_ota_handle_t otaH = 0; static const esp_partition_t *otaPart = nullptr;
+static bool otaOn = false, canHostSeen = false;
+static uint32_t otaSize = 0, otaNext = 0, otaGot = 0, otaCrc = 0xFFFFFFFF, otaLastRx = 0, otaRebootAt = 0, otaSavedPeriod = 100, otaLastAck = 0;
+static uint8_t otaBuf[4096]; static uint16_t otaFill = 0;
+static uint32_t crcTab[256];
+static void crcInit() { for (uint32_t i = 0; i < 256; i++) { uint32_t c = i; for (int k = 0; k < 8; k++) c = (c & 1) ? (c >> 1) ^ 0xEDB88320u : c >> 1; crcTab[i] = c; } }
+static void crcUpd(uint32_t &c, const uint8_t *d, int n) { for (int i = 0; i < n; i++) c = crcTab[(c ^ d[i]) & 0xFF] ^ (c >> 8); }
+static int runningSlot() { const esp_partition_t *r = esp_ota_get_running_partition(); return r ? (int)r->subtype - (int)ESP_PARTITION_SUBTYPE_APP_OTA_0 : -1; }
+static void otaAckSend(uint8_t st) {
+  uint8_t d[8] = {(uint8_t)otaNext, (uint8_t)(otaNext >> 8), (uint8_t)(otaNext >> 16), st, 0, 0, 0, 0};
+  nc::put32(d + 4, otaGot); canSendEx(nc::ID_OTA_ACK, d, 8, false); otaLastAck = millis();
+}
+static void otaAbort() {
+  if (otaOn) { esp_ota_abort(otaH); otaOn = false; canPeriod = otaSavedPeriod; }
+}
+static uint8_t otaBegin(uint32_t size) {
+  if (size < 4096 || size > 0x300000) return nc::ST_BAD_ARG;
+  otaAbort(); allOff();                              // never update with anything energized
+  otaPart = esp_ota_get_next_update_partition(nullptr);
+  if (!otaPart || esp_ota_begin(otaPart, size, &otaH) != ESP_OK) return nc::ST_REJECTED;
+  otaSize = size; otaNext = 0; otaGot = 0; otaCrc = 0xFFFFFFFF; otaFill = 0; otaOn = true; otaLastRx = millis();
+  otaSavedPeriod = canPeriod; canPeriod = 0;         // quiet bus while updating (heartbeat continues)
+  return nc::ST_OK;
+}
+static bool otaFlush() {
+  if (!otaFill) return true;
+  bool ok = esp_ota_write(otaH, otaBuf, otaFill) == ESP_OK; otaFill = 0; return ok;
+}
+static void otaData(const uint8_t *d) {
+  if (!otaOn) return;
+  uint32_t seq = d[0] | (d[1] << 8) | (d[2] << 16); otaLastRx = millis();
+  if (seq != otaNext) { if (millis() - otaLastAck > 5) otaAckSend(nc::OTA_OK); return; }   // out of order: tell the host what we expect
+  int n = otaSize - otaGot < (uint32_t)nc::OTA_PAYLOAD ? (int)(otaSize - otaGot) : nc::OTA_PAYLOAD;
+  memcpy(otaBuf + otaFill, d + 3, n); crcUpd(otaCrc, d + 3, n); otaFill += n; otaGot += n; otaNext++;
+  if (otaFill > 4090 || otaGot == otaSize) { if (!otaFlush()) { otaAbort(); otaAckSend(nc::OTA_ERR_WRITE); return; } }
+  if (otaNext % nc::OTA_WINDOW == 0 || otaGot == otaSize) otaAckSend(nc::OTA_OK);
+}
+static uint8_t otaEnd(uint32_t crc) {
+  if (!otaOn || otaGot != otaSize) return nc::ST_REJECTED;
+  bool ok = otaFlush() && (otaCrc ^ 0xFFFFFFFF) == crc;
+  if (ok) ok = esp_ota_end(otaH) == ESP_OK && esp_ota_set_boot_partition(otaPart) == ESP_OK;
+  else esp_ota_abort(otaH);
+  otaOn = false; canPeriod = otaSavedPeriod;
+  if (!ok) return nc::ST_REJECTED;
+  otaRebootAt = millis() + 500; return nc::ST_OK;
+}
+static void otaHousekeeping() {                      // call from the telemetry tick
+  if (otaOn && millis() - otaLastRx > 10000) otaAbort();                       // sender vanished
+  if (otaRebootAt && millis() > otaRebootAt) esp_restart();
+  if (otaPending) {                                  // freshly updated image: must hear from the host, else roll back
+    if (canHostSeen) { esp_ota_mark_app_valid_cancel_rollback(); otaPending = false; }
+    else if (millis() > 60000) { esp_ota_mark_app_invalid_rollback_and_reboot(); esp_restart(); }
+  }
+}
+static void otaInit() {
+  crcInit();
+  const char *t = FW_TAG " " __DATE__ " " __TIME__; buildId = 2166136261u; for (; *t; t++) buildId = (buildId ^ (uint8_t)*t) * 16777619u;
+  const esp_partition_t *r = esp_ota_get_running_partition(); esp_ota_img_states_t st;
+  if (r && esp_ota_get_state_partition(r, &st) == ESP_OK) { otaStateRaw = (int)st; if (st == ESP_OTA_IMG_PENDING_VERIFY) otaPending = true; }
+}
+
+static void canAck(uint8_t op, uint8_t st, const uint8_t *args) {
+  uint8_t d[8] = {op, st, 0, 0, 0, 0, 0, 0};
+  if (args) memcpy(d + 2, args, 6);
+  canSendEx(nc::ID_ACK, d, 8, true);
+}
+static void canOnFrame(const twai_message_t &m) {
+  if (m.identifier == nc::ID_OTA_DATA && !m.extd && m.data_length_code == 8) { otaData(m.data); return; }
+  if (m.extd || m.identifier != nc::ID_CMD || m.data_length_code < 1) return;
+  uint8_t a[8] = {0}; memcpy(a, m.data, m.data_length_code > 8 ? 8 : m.data_length_code);
+  const int n = m.data_length_code;
+  const uint8_t op = a[0]; uint8_t st = nc::ST_OK;
+  canHostSeen = true;                                 // a real host is on the bus (confirms a freshly updated image)
+  if (op == nc::OP_OFF) { allOff(); lastPing = millis(); canAck(op, st, a + 1); return; }   // safety: always honoured
+  if (op == nc::OP_OTA_INFO) { uint8_t d[8] = {op, 0, (uint8_t)runningSlot(), (uint8_t)((otaPending ? 1 : 0) | (otaOn ? 2 : 0)), 0, 0, 0, 0}; nc::put32(d + 4, buildId); canSendEx(nc::ID_ACK, d, 8, true); return; }
+  if (usbActive()) { canAck(op, op == nc::OP_PING ? nc::ST_OK : nc::ST_BUSY, a + 1); return; }   // USB has priority
+  lastPing = millis();                                // CAN controls while USB is idle: any command feeds the dead-man
+  const int ch = a[1];
+  auto needCh = [&](int len) { return n >= len && ch >= 0 && ch < NHEAT; };
+  switch (op) {
+    case nc::OP_PING: break;
+    case nc::OP_CLEAR_ALL: for (auto &h : H) if (h.trip) h.trip = 0; break;
+    case nc::OP_FUSE: if (n < 2) { st = nc::ST_BAD_ARG; break; } fuseSet(a[1] ? 1 : 0); break;
+    case nc::OP_H_MODE: if (!needCh(3) || a[2] > 2) { st = nc::ST_BAD_ARG; break; }
+      setMode(ch, a[2]); if (H[ch].mode != a[2]) st = nc::ST_REJECTED; break;           // latched trip: clear it first
+    case nc::OP_H_DUTY: if (!needCh(4)) { st = nc::ST_BAD_ARG; break; } H[ch].man = clampf(nc::get16(a + 2) / 100.0f, 0, 100); break;
+    case nc::OP_H_SP: if (!needCh(4)) { st = nc::ST_BAD_ARG; break; } H[ch].sp = clampf(nc::geti16(a + 2) / 100.0f, -20, 150); break;
+    case nc::OP_H_PID: if (!needCh(8)) { st = nc::ST_BAD_ARG; break; }
+      H[ch].kp = clampf(nc::get16(a + 2) / 100.0f, 0, 1000); H[ch].ki = clampf(nc::get16(a + 4) / 100.0f, 0, 1000);
+      H[ch].kd = clampf(nc::get16(a + 6) / 100.0f, 0, 1000); break;
+    case nc::OP_H_LIM: if (!needCh(6)) { st = nc::ST_BAD_ARG; break; }
+      H[ch].maxDuty = clampf(nc::get16(a + 2) / 100.0f, 0, 100); H[ch].maxT = clampf(nc::geti16(a + 4) / 10.0f, 0, 150); break;
+    case nc::OP_H_FREQ: if (!needCh(4)) { st = nc::ST_BAD_ARG; break; } heaterFreq(ch, nc::get16(a + 2)); break;
+    case nc::OP_H_CLEAR: if (!needCh(2)) { st = nc::ST_BAD_ARG; break; } H[ch].trip = 0; break;
+    case nc::OP_SOL: if (n < 2) { st = nc::ST_BAD_ARG; break; } solSet(a[1]); break;
+    case nc::OP_M_SPEED: if (n < 5) { st = nc::ST_BAD_ARG; break; } M.target = clampf(nc::get32(a + 1) / 10.0f, 0, 100000); break;
+    case nc::OP_M_ACCEL: if (n < 5) { st = nc::ST_BAD_ARG; break; } M.accel = clampf((float)nc::get32(a + 1), 10, 1000000); break;
+    case nc::OP_M_CFG: if (n < 6 || a[2] > 2 || a[4] > 2) { st = nc::ST_BAD_ARG; break; }
+      M.sleepHi = a[1] ? 1 : 0; if (!M.sleepHi) motorStop();
+      M.en = a[2]; if (!M.en) motorStop();
+      M.dir = a[3] ? 1 : 0; M.stl = a[4]; M.stlDis = a[5] ? 1 : 0; motorApplyPins(); break;
+    case nc::OP_M_CLEAR: digitalWrite(PIN_M_SLEEP, LOW); delay(5); digitalWrite(PIN_M_SLEEP, M.sleepHi ? HIGH : LOW); break;
+    case nc::OP_THERM: if (n < 7) { st = nc::ST_BAD_ARG; break; }
+      thermBeta = clampf(nc::get16(a + 1), 1000, 10000); thermR0 = clampf((float)nc::get32(a + 3), 100, 1000000); break;
+    case nc::OP_RATE: { if (n < 3) { st = nc::ST_BAD_ARG; break; } uint16_t v = nc::get16(a + 1);
+      if (v == 0 || (v >= 10 && v <= 5000)) canPeriod = v; else st = nc::ST_BAD_ARG; break; }
+    case nc::OP_OTA_BEGIN: if (n < 5) { st = nc::ST_BAD_ARG; break; } st = otaBegin(nc::get32(a + 1)); break;
+    case nc::OP_OTA_END: if (n < 5) { st = nc::ST_BAD_ARG; break; } st = otaEnd(nc::get32(a + 1)); break;
+    case nc::OP_OTA_ABORT: otaAbort(); break;
+    default: st = nc::ST_UNKNOWN;
+  }
+  canAck(op, st, a + 1);
+}
+
+static void canTelemFrame(int k) {                    // build and send telemetry frame k (0..N_TELEM_FRAMES-1)
+  static uint8_t seq = 0; uint8_t d[8] = {0}; uint32_t id; uint32_t now = millis();
+  if (k == 0) {
+    id = nc::ID_SYS; nc::put32(d, now);
+    d[4] = (digitalRead(PIN_FUSE_PG) ? nc::SF_FUSE_PG : 0) | (digitalRead(PIN_FUSE_FLT) ? nc::SF_FUSE_FLT : 0) |
+           (fuseInhibit ? nc::SF_INHIBIT : 0) | (solOn ? nc::SF_SOL : 0) | (digitalRead(PIN_DRV_NFAULT) ? nc::SF_NFAULT_OK : 0) |
+           (digitalRead(PIN_M_STLREP) ? nc::SF_STL_REP : 0) | (now - lastPing < DEADMAN_MS ? nc::SF_DEADMAN_OK : 0) |
+           (usbActive() ? nc::SF_USB_ACTIVE : 0);
+    d[5] = (uint8_t)esp_reset_reason();
+    for (int i = 0; i < NHEAT; i++) { if (H[i].mode) d[6] |= 1 << i; if (H[i].trip) d[7] |= 1 << i; }
+  } else if (k <= 6) {
+    int i = k - 1; Heater &h = H[i]; id = nc::ID_HEAT + i;
+    d[0] = (h.mode & 3) | (h.tok ? 4 : 0) | ((h.trip & 7) << 4);
+    nc::put16(d + 1, (uint16_t)s16(h.tvalid ? h.T : NAN, 100)); nc::put16(d + 3, (uint16_t)s16(h.sp, 100));
+    nc::put16(d + 5, (uint16_t)constrain(lroundf(h.duty * 100), 0L, 10000L)); d[7] = seq++;
+  } else if (k <= 12) {
+    int i = k - 7; id = nc::ID_POWER + i;
+    nc::put16(d, u16s(cache.vbus[i], 1000)); nc::put16(d + 2, (uint16_t)s16(cache.ma[i], 1));
+    nc::put16(d + 4, u16s(cache.pw[i], 100)); nc::put16(d + 6, (uint16_t)s16(cache.die[i], 10));
+  } else if (k == 13) {
+    id = nc::ID_PRESS; nc::put16(d, (uint16_t)s16(cache.p[0], 100)); nc::put16(d + 2, (uint16_t)s16(cache.p[1], 100));
+    nc::put16(d + 4, (uint16_t)s16(cache.pt[0], 100)); nc::put16(d + 6, (uint16_t)s16(cache.pt[1], 100));
+  } else if (k == 14) {
+    id = nc::ID_ENV; nc::put16(d, (uint16_t)s16(cache.flow, 100)); nc::put16(d + 2, (uint16_t)s16(cache.flowT, 100));
+    nc::put16(d + 4, (uint16_t)s16(cache.shtT, 100)); nc::put16(d + 6, u16s(cache.rh, 100));
+  } else if (k == 15) {
+    id = nc::ID_MOTOR; nc::put32(d, (uint32_t)lroundf(M.cur)); nc::put16(d + 4, (uint16_t)analogReadMilliVolts(PIN_M_TRQ));
+    d[6] = (M.sleepHi ? 1 : 0) | ((M.en & 3) << 1) | (M.dir ? 8 : 0) | (M.stlDis ? 16 : 0) |
+           (digitalRead(PIN_DRV_NFAULT) ? 32 : 0) | (digitalRead(PIN_M_STLREP) ? 64 : 0);
+    d[7] = M.stl;
+  } else if (k == 16) {
+    id = nc::ID_MOTOR2; nc::put32(d, (uint32_t)lroundf(M.target * 10)); nc::put32(d + 4, (uint32_t)lroundf(M.accel));
+  } else if (k == 17) {
+    id = nc::ID_ADC; nc::put16(d, u16s(cache.imon, 1000)); nc::put16(d + 2, u16s(cache.ftemp, 1000));
+    nc::put16(d + 4, (uint16_t)(i2cHz / 1000)); nc::put16(d + 6, (uint16_t)canPeriod);
+  } else {
+    twai_status_info_t st = {}; twai_get_status_info(&st);
+    id = nc::ID_DEV; nc::put16(d, cache.live); nc::put16(d + 2, cache.ok); nc::put16(d + 4, (uint16_t)lastCycleMs);
+    d[6] = st.tx_error_counter > 255 ? 255 : st.tx_error_counter; d[7] = st.rx_error_counter > 255 ? 255 : st.rx_error_counter;
+  }
+  canSendEx(id, d, 8, false);
+}
+static void canTelemTick() {                          // spreads one telemetry period across all frames (no TX bursts)
+  otaHousekeeping();
+  if (!canOn || canMode == 1) return;
+  uint32_t now = millis();
+  static uint32_t lastHb = 0, lastF = 0; static int k = 0;
+  if (now - lastHb >= 1000) {
+    lastHb = now; uint8_t d[8] = {'N', nc::PROTO_VER, (uint8_t)runningSlot(), (uint8_t)((otaPending ? 1 : 0) | (otaOn ? 2 : 0)), 0, 0, 0, 0}; nc::put32(d + 4, now); canSendEx(nc::ID_HB, d, 8, false);
+  }
+  if (!canPeriod) return;
+  uint32_t gapUs = canPeriod * 1000UL / nc::N_TELEM_FRAMES;      // exact spacing, catch-up after long I2C stretches
+  uint32_t us = micros();
+  if (us - lastF > 20UL * gapUs) lastF = us - gapUs;               // resync after a long stall (never burst more than a few frames)
+  for (int sent = 0; sent < 8 && (uint32_t)(us - lastF) >= gapUs; sent++) { lastF += gapUs; canTelemFrame(k); k = (k + 1) % nc::N_TELEM_FRAMES; }
 }
 
 // ---------------------------------------------------------------- setup / loop
 void setup() {
   for (auto &h : H) { pinMode(h.pin, OUTPUT); digitalWrite(h.pin, LOW); }   // safe state first
   Serial.begin(115200);
+  Serial.setTxTimeoutMs(5);                          // no USB host reading: never stall the loop (CAN-only operation)
   for (auto &h : H) { ledcAttach(h.pin, h.freq, PWM_BITS); ledcWrite(h.pin, 0); }
   for (const Gp &g : GPIOS) pinMode(g.pin, INPUT);
   pinMode(PIN_FUSE_EN, OUTPUT); digitalWrite(PIN_FUSE_EN, HIGH);   // e-fuse ON at boot (heater gates are LOW)
   busInit(0); busInit(1);
   pinMode(PIN_SOL, OUTPUT); digitalWrite(PIN_SOL, LOW);
   motorInit();
+  { float *f = (float *)&cache; for (size_t i = 0; i < (sizeof(cache) - 4) / 4; i++) f[i] = NAN; }
+  otaInit();
   canStart(500, 0);
   delay(300);
 }
@@ -632,5 +880,5 @@ void setup() {
 void loop() {
   uint32_t t0 = millis();
   cycle();
-  do { handleSerial(); controlTick(); canPoll(); if (telemMs) delay(1); } while (millis() - t0 < telemMs);
+  do { handleSerial(); controlTick(); canPoll(); canTelemTick(); if (telemMs) delay(1); } while (millis() - t0 < telemMs);
 }
